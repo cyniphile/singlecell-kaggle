@@ -11,15 +11,16 @@ Your work will help accelerate innovation in methods of mapping genetic informat
 
 ## To study
 
+- Competition announcement [twitter thread](https://twitter.com/dbburkhardt/status/1559304603933589504) 
 
-https://twitter.com/dbburkhardt/status/1559304603933589504
+- Recommended [background information](https://twitter.com/MorseCell/status/1559583479158931459) 
 
-https://twitter.com/MorseCell/status/1559583479158931459
+- ATAC data - Assay of Transcription available chromatin
 
-ATAC data - Assay of Transcription available chromatin
-GEX data - gene expression: https://support.10xgenomics.com/single-cell-multiome-atac-gex/software/visualization/latest/tutorial-navigation
+- GEX data - gene expression
+  - https://support.10xgenomics.com/single-cell-multiome-atac-gex/software/visualization/latest/tutorial-navigation
 
-"In single-cell data science, dynamic processes have been modeled by so-called pseudotime algorithms that capture the progression of the biological process. Yet, generalizing these algorithms to account for both pseudotime and real time is still an open problem."
+- "In single-cell data science, dynamic processes have been modeled by so-called pseudotime algorithms that capture the progression of the biological process. Yet, generalizing these algorithms to account for both pseudotime and real time is still an open problem."
 
-
+- CD34+ hematopoietic stem and progenitor cells (HSPCs)
 
