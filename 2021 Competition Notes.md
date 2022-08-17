@@ -1,0 +1,75 @@
+Competition started Sep 8, 2021
+
+[Video](https://twitter.com/MorseCell/status/1559583479158931459) Notes
+============
+- Jon Bloom at Cellarity, contact of Gleb
+	- Intro: data is high dimensional "multimodal"
+	- "common task framework": need to have open source data to properly benchmark modeling advances. (duh?)
+		- This is correlated with ML advancements
+		- TODO: what are dna motifs?
+	- cells signals are noisy, and multimodal. Ground truth is fuzzier than other ML problems
+	- Here we are talking about manually annotated real data (not generative) which is neither scalable nor completely objective
+	- measurements tend to destroy the cells (only one measurement)
+	- ****Recently there are new methods of doing high-throughput multimodal measurements
+		- DNA accessability (ATAC) and nucleus with nuclear RNA
+		- RNA measurement
+		- cell surface protein measurement
+	- Task one: predict one modality from the other (just like speech to text translation)
+	- Task two: "align cells across modalities"...integrating single modality datasets
+	- Task three: classify cells into identity and dynamical situations based on multimodal data
+	- Some methods exist:
+		- BABEL
+		- MultiVI
+		- Problem: they are not "common task framework"
+	- So they made a dataset (used bone marrow) 
+	- They've built some infra?
+- Angela Piasco:
+	- Biohub: generating large single cell atlas for all cell types
+	- RNA is important, and, so far, most scalable. 
+	- History: scTranscription was 2009. But new stuff popping up (e.g. ATAC, protein measurements)
+	- Why single cell? Well, all cells are different despite same genome. 
+	- Need to consider epigenetics
+	- Each modality should be someone orthogonal to others. 
+	- Work on Epigenome + transcriptome using 10x genomic kit. 
+		- barcoded Gel beads, the match "poly(dt) sequence that enables production of barcoded, full-length cDNA from poly-adenylated mRNA for gene expression library." ?? and "Spacer sequence that enables barcode attachment to transposed DNA fragments for ATAC library" ?? 20:35 
+	- Important: 
+		- there is a fixed feature space for gene expression: count expected genes and amount of expression
+		- for ATAC, feature space is variable because different things are accessible at different times. 
+	-Other modality: CITE-seq. Make antibodies with a barcode to detect protein expression
+- Chloe Villani
+	- immune system is challenging, network of specialized organs spread through all tissues. 
+	- large number of immune states that are different for every human
+	- cells can change identities
+	- need a scalable framework
+	- How do you define a stable cell type?
+	- How do you draw a border between types (it's fuzzy)
+	- Hard to get unbiased labels/type definitions
+	- Why bone marrow? Main side of blood production.
+		- Talks about the way types branch out from stem cells. 29:40 We now know they diverge more or less continuously
+		- This means there is inconsistent labeling and data. 
+		- Bone marrow is well studied so ground truth is more clear.
+		- It's continuous spectrum of cell types
+		- disease relevant
+		- commercially available
+	- RNAseq defines cell types/states by expression
+	- ATACseq define transitional states through critical transcription factor changes
+	- Protein market data: a legacy market already used for decades
+	- interesting data viz of markers vs cell types
+	- used U-man?? seems to be a type of t-sne embedding
+	- there is biological and technical (between lab) variability
+	- current classifiers often miss rare cell states
+	- It's hard to link states across modalities
+	- Even nomenclatures is non-standardized
+	- computational scalability is hard
+- Daniel Burkhardt ML-scientist works with Jon
+	- lists the goals of the old competition
+		- new, inter-modality representations
+		- cross-modality translation
+		- matching modalities to cells, where cell data source is unknown. 
+	- some interesting caveats about clustering problems that I didn't fully understand (50:00)
+- Discussion https://youtu.be/ZXDILOyiy7A?t=3778
+
+
+
+- [Last year's results](https://www.biorxiv.org/content/10.1101/2022.04.11.487796v1.full.pdf) and [code.](https://github.com/openproblems-bio/neurips2021_multimodal_topmethods)
+  - [Summary video](https://openproblems.bio/neurips_2021/)
