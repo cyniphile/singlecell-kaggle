@@ -67,7 +67,7 @@ Competition started Sep 8, 2021
 		- cross-modality translation
 		- matching modalities to cells, where cell data source is unknown. 
 	- some interesting caveats about clustering problems that I didn't fully understand (50:00)
-- Discussion https://youtu.be/ZXDILOyiy7A?t=3778
+- Discussion, very broad and not very useful for this particular task
 
 
 
