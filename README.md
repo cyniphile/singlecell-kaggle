@@ -31,10 +31,11 @@ For the CITEseq samples: given gene expression, predict protein levels.
   - https://scverse.org/
   - Other [sc tools](https://www.kaggle.com/competitions/open-problems-multimodal/discussion/344816) 
 - Research papers:
-  - [recommended on kaggle](https://www.kaggle.com/competitions/open-problems-multimodal/discussion/344686)
+  - [recommended on Kaggle](https://www.kaggle.com/competitions/open-problems-multimodal/discussion/344686)
   - https://www.kaggle.com/competitions/open-problems-multimodal/discussion/344687
   - https://www.kaggle.com/competitions/open-problems-multimodal/discussion/344688
   - [Example notebooks](https://www.kaggle.com/competitions/open-problems-multimodal/discussion/344824) 
+  - https://www.kaggle.com/competitions/open-problems-multimodal/discussion/346686
 
 
 ## Background
@@ -47,3 +48,8 @@ For the CITEseq samples: given gene expression, predict protein levels.
 ### CD34+ hematopoietic stem and progenitor cells (HSPCs)
 - "Hematopoietic stem and progenitor cells (HSPCs) are a rare population of precursor cells that possess the capacity for self-renewal and multilineage differentiation."
 - https://en.wikipedia.org/wiki/Hematopoietic_stem_cell
+
+
+## Random ideas
+
+Dna and Rna expression could be passed through [Unirep](https://github.com/ElArkk/jax-unirep) as a form of dimensionality reduction
