@@ -17,6 +17,11 @@
  test_cite_inputs_day_2_donor_27678.h5 | Test set cells got replaced with training set cells. Can ignore?  See: `data_problem_fix.ipynb` 
  metadata_cite_day_2_donor_27678.csv  | same as above but for this day/donor
 
+## Sparse Data
+Each "xxx.h5" file is converted into two files:
+
+- One "xxx_values.sparse" file that can be loaded with scipy.sparse.load_npz and contains all the values of the corresponding dataframe (i.e. the result of df.values in a sparse format)
+- - - - - - - - - One "xxx_idxcol.npz" file that can be loaded with np.load and contains the values of the index and the columns of the corresponding dataframe (i.e the results of df.index and df.columns)
 
 ## Generation Notes
 https://www.kaggle.com/competitions/open-problems-multimodal/data

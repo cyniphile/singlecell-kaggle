@@ -68,4 +68,5 @@ A few sklearn methods are naturally multi-output (`LinearRegression` (and relate
 - Someone notes that most of the donors are male, but one is female. Brainstorm other characteristics and features to extract
 - Since we are working with count data (albeit normalized), I'm thinking poisson regression might lend a more powerful prior. 
 - Make sure to account for promoter regions/transcription factors as genes  
+  - Inputs: For the RNA counts, each row corresponds to a cell and each column to a gene. The column format for a gene is given by {EnsemblID}_{GeneName} where EnsemblID refers to the [Ensembl Gene ID](https://www.ebi.ac.uk/training/online/courses/ensembl-browsing-genomes/navigating-ensembl/investigating-a-gene/#:~:text=Ensembl%20gene%20IDs%20begin%20with,of%20species%20other%20than%20human) and GeneName to the gene name.
 
