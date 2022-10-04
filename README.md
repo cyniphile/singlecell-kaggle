@@ -49,6 +49,13 @@ For the CITEseq samples: given gene expression, predict protein levels.
 
 ## Notes
 
+### Multivariate regression
+
+For a simple linear model, it seems to be equivalent to running $n$ regressions when you want to predict and length $n$ vector, but would like to worth through the math?
+
+A few sklearn methods are naturally multi-output (`LinearRegression` (and related) `KNeighborsRegressor DecisionTreeRegressor RandomForestRegressor`), and for the rest there is a wrapper `MultiOutputRegressor(model)` that runs $n$ single-output regressions using any single-output model. 
+
+
 
 ### CD34+ hematopoietic stem and progenitor cells (HSPCs)
 - "Hematopoietic stem and progenitor cells (HSPCs) are a rare population of precursor cells that possess the capacity for self-renewal and multilineage differentiation."
@@ -59,3 +66,6 @@ For the CITEseq samples: given gene expression, predict protein levels.
 
 - Dna and Rna expression could be passed through [Unirep](https://github.com/ElArkk/jax-unirep) as a form of dimensionality reduction
 - Someone notes that most of the donors are male, but one is female. Brainstorm other characteristics and features to extract
+- Since we are working with count data (albeit normalized), I'm thinking poisson regression might lend a more powerful prior. 
+- Make sure to account for promoter regions/transcription factors as genes  
+

@@ -1,3 +1,23 @@
+## Cite-seq 
+ train_cite_inputs.h5 | features (rna genes)
+ train_cite_targets.h5 | targets (protein genes)
+ test_cite_inputs.h5 | test features
+
+## Multiome
+ train_multi_targets.h5 | features
+ train_multi_inputs.h5 | labels
+ test_multi_inputs.h5 | test features
+
+## Meta
+ evaluation_ids.csv | A map from `cell_id` X `gene_id` -> `row_id`
+ metadata.csv | Maps `cell_type`, `donor` and `technology` -> `cell_id`
+ sample_submission.csv | `row_id` -> `count` (of expression)
+
+## Error
+ test_cite_inputs_day_2_donor_27678.h5 | Test set cells got replaced with training set cells. Can ignore?  See: `data_problem_fix.ipynb` 
+ metadata_cite_day_2_donor_27678.csv  | same as above but for this day/donor
+
+
 ## Generation Notes
 https://www.kaggle.com/competitions/open-problems-multimodal/data
 
@@ -28,5 +48,3 @@ For the CITEseq samples: given gene expression, predict protein levels.
   - "It's time to stop making t-SNE & UMAP plots. In a new preprint w/ Tara Chari we show that while they display some correlation with the underlying high-dimension data, they don't preserve local or global structure & are misleading. They're also arbitrary." https://twitter.com/lpachter/status/1431325969411821572?s=21&t=HtzVmulBKba77ShXSQcKIQ
   - "My rule of my thumb, if the data has structure it should be immediately obvious. PCA then UMAP is a reasonable place to start. Never a good idea to fiddle parameters until you find what you're looking for."
   - "Well, I’ve used a lot of umaps in my day, but scanpy has really convenient plotting tools for heatmaps, dotplots,  violin plots, and much more. https://scanpy-tutorials.readthedocs.io/en/latest/plotting/core.html"
-
-
