@@ -5,8 +5,6 @@ The goal of this competition is to predict how DNA, RNA, and protein measurement
 
 You will develop a model trained on a subset of 300,000-cell time course dataset of CD34+ hematopoietic stem and progenitor cells (HSPC) from four human donors at five time points generated for this competition by Cellarity, a cell-centric drug creation company.
 
-
-
 For the Multiome samples: given chromatin accessibility, predict gene expression.
 For the CITEseq samples: given gene expression, predict protein levels.
 
@@ -55,15 +53,22 @@ For a simple linear model, it seems to be equivalent to running $n$ regressions 
 
 A few sklearn methods are naturally multi-output (`LinearRegression` (and related) `KNeighborsRegressor DecisionTreeRegressor RandomForestRegressor`), and for the rest there is a wrapper `MultiOutputRegressor(model)` that runs $n$ single-output regressions using any single-output model. 
 
-
-
 ### CD34+ hematopoietic stem and progenitor cells (HSPCs)
 - "Hematopoietic stem and progenitor cells (HSPCs) are a rare population of precursor cells that possess the capacity for self-renewal and multilineage differentiation."
 - https://en.wikipedia.org/wiki/Hematopoietic_stem_cell
 
 
-## Random ideas
+## Engineering Notes
+- 100hr/month Free compute with [Saturn Cloud](https://www.kaggle.com/competitions/open-problems-multimodal/discussion/346999#1909222)
+  - Luke's: https://app.community.saturnenterprise.io/dash/o/community/user-details/
+- At least see what is possible on a downsampled dataset. 
+ 
+- On visualization:
+  - "It's time to stop making t-SNE & UMAP plots. In a new preprint w/ Tara Chari we show that while they display some correlation with the underlying high-dimension data, they don't preserve local or global structure & are misleading. They're also arbitrary." https://twitter.com/lpachter/status/1431325969411821572?s=21&t=HtzVmulBKba77ShXSQcKIQ
+  - "My rule of my thumb, if the data has structure it should be immediately obvious. PCA then UMAP is a reasonable place to start. Never a good idea to fiddle parameters until you find what you're looking for."
+  - "Well, I’ve used a lot of umaps in my day, but scanpy has really convenient plotting tools for heatmaps, dotplots,  violin plots, and much more. https://scanpy-tutorials.readthedocs.io/en/latest/plotting/core.html"
 
+## Random ideas
 - Dna and Rna expression could be passed through [Unirep](https://github.com/ElArkk/jax-unirep) as a form of dimensionality reduction
 - Someone notes that most of the donors are male, but one is female. Brainstorm other characteristics and features to extract
 - Since we are working with count data (albeit normalized), I'm thinking poisson regression might lend a more powerful prior. 

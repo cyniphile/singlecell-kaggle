@@ -220,7 +220,7 @@ benchmark = ["memory-profiler (>=0.57.0)", "pandas (>=1.0.5)", "matplotlib (>=3.
 
 [[package]]
 name = "scipy"
-version = "1.9.0"
+version = "1.9.1"
 description = "SciPy: Scientific Library for Python"
 category = "main"
 optional = false
@@ -329,7 +329,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "3.10.6"
-content-hash = "db3ae9e87286e840612efa61c8c3fea8ada252bf399b8ab86cb883cc56b99a58"
+content-hash = "b6f0673f28924bed2c26aa76a0e3b9582d6c24e23ba48fdf2a2309d1caf4e36e"
 
 [metadata.files]
 autopep8 = []

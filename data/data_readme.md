@@ -18,10 +18,12 @@
  metadata_cite_day_2_donor_27678.csv  | same as above but for this day/donor
 
 ## Sparse Data
+https://www.kaggle.com/datasets/fabiencrom/multimodal-single-cell-as-sparse-matrix
+
 Each "xxx.h5" file is converted into two files:
 
 - One "xxx_values.sparse" file that can be loaded with scipy.sparse.load_npz and contains all the values of the corresponding dataframe (i.e. the result of df.values in a sparse format)
-- - - - - - - - - One "xxx_idxcol.npz" file that can be loaded with np.load and contains the values of the index and the columns of the corresponding dataframe (i.e the results of df.index and df.columns)
+- One "xxx_idxcol.npz" file that can be loaded with np.load and contains the values of the index and the columns of the corresponding dataframe (i.e the results of df.index and df.columns)
 
 ## Generation Notes
 https://www.kaggle.com/competitions/open-problems-multimodal/data
@@ -36,20 +38,5 @@ https://www.kaggle.com/competitions/open-problems-multimodal/data
 	- Gene expression (rna)
 - Taken at five time points over a 10 day period. (Is there any known biology about timing?)
 
-SO there are two gene expression datasets?
+TODO: So there are two gene expression datasets??
 
-*Task:*
-For the Multiome samples: given chromatin accessibility, predict gene expression.
-For the CITEseq samples: given gene expression, predict protein levels.
-
-
-## Engineering Notes
-- Data is big, and I don't have a GPU :-(. Might have to use cloud notebooks...or buy one (-___-)
-  - 100hr/month Free compute with [Saturn Cloud](https://www.kaggle.com/competitions/open-problems-multimodal/discussion/346999#1909222)
-    - Luke's: https://app.community.saturnenterprise.io/dash/o/community/user-details/
-- At least see what is possible on a downsampled dataset. 
- 
- - On visualization:
-  - "It's time to stop making t-SNE & UMAP plots. In a new preprint w/ Tara Chari we show that while they display some correlation with the underlying high-dimension data, they don't preserve local or global structure & are misleading. They're also arbitrary." https://twitter.com/lpachter/status/1431325969411821572?s=21&t=HtzVmulBKba77ShXSQcKIQ
-  - "My rule of my thumb, if the data has structure it should be immediately obvious. PCA then UMAP is a reasonable place to start. Never a good idea to fiddle parameters until you find what you're looking for."
-  - "Well, I’ve used a lot of umaps in my day, but scanpy has really convenient plotting tools for heatmaps, dotplots,  violin plots, and much more. https://scanpy-tutorials.readthedocs.io/en/latest/plotting/core.html"
