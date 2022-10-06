@@ -41,6 +41,31 @@ unicode = ["unicodedata2 (>=14.0.0)"]
 woff = ["zopfli (>=0.1.4)", "brotlicffi (>=0.8.0)", "brotli (>=1.0.1)"]
 
 [[package]]
+name = "h5py"
+version = "3.7.0"
+description = "Read and write HDF5 files from Python"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+numpy = ">=1.14.5"
+
+[[package]]
+name = "hdf5plugin"
+version = "3.3.1"
+description = "HDF5 Plugins for Windows, MacOS, and Linux"
+category = "main"
+optional = false
+python-versions = ">=3.4"
+
+[package.dependencies]
+h5py = "*"
+
+[package.extras]
+dev = ["sphinx", "sphinx-rtd-theme"]
+
+[[package]]
 name = "joblib"
 version = "1.2.0"
 description = "Lightweight pipelining with Python functions"
@@ -329,7 +354,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "3.10.6"
-content-hash = "b6f0673f28924bed2c26aa76a0e3b9582d6c24e23ba48fdf2a2309d1caf4e36e"
+content-hash = "8948b406b6612174ac77ab69054f4a93106f19a525be3703864d4bb5c11959e1"
 
 [metadata.files]
 autopep8 = []
@@ -338,6 +363,8 @@ cycler = [
     {file = "cycler-0.11.0.tar.gz", hash = "sha256:9c87405839a19696e837b3b818fed3f5f69f16f1eec1a1ad77e043dcea9c772f"},
 ]
 fonttools = []
+h5py = []
+hdf5plugin = []
 joblib = []
 kiwisolver = []
 matplotlib = []
