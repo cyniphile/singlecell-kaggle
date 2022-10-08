@@ -1,10 +1,25 @@
+## 10/7
+
+Working on getting that baseline model out. Used `TruncatedSVD` to reduce to 64 cols, and submitted my first full prediction. Still low on the totem but not terrible like before.
+
+Next steps: 
+- Clean up code
+  - set up nice pipeline
+  - set up cross validation
+- Do ridge regression
+- Might want to just research it too
+- Regress on correlation vs MSE
+- Try adding day as a feature (scalar)
 
 ## 10/6
 
 Spent yesterday/this morning working on screenplay stuff. Today get some basic EDA done on the multiome data, get a better feel for handling `.npz` and sparse data, then do a downsampled linear regression. TBF, it probably makes sense to do some type of PCA from the get-go because, c'mon 200k columns??!! Goal, resubmit with a full two-task prediction. 
 
-- TODO: How to merge with metadata?
-- Need to take time into account
+Wasted a good amount of time on figuring out how to just read the column names of an `.hd5` file. It turned out to be an series of arcane (and idiotic) tricks that baffled even Jason (neither of us had any idea what `list[()]` means).
+
+In the end, all the columns have different labels across all data. There might be a way to parse them into each other, but will take extra work.
+
+- TODO: How to merge with metadata? Especially "Day" 
 
 ## 10/5
 
