@@ -7,7 +7,7 @@ Next steps:
   - set up nice pipeline
   - set up cross validation
 - Do ridge regression
-- Might want to just research it too
+- Might want to just research what others have done on Kaggle already too. Really not a ton of point in redoing work. 
 - Regress on correlation vs MSE
 - Try adding day as a feature (scalar)
 
