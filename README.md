@@ -76,3 +76,6 @@ pyenv shell 3.10.6
 ```sh
 poetry install 
 ```
+
+# TODO: Instructions on where to download and extract.
+2. Download the dataset and extract to `data`.

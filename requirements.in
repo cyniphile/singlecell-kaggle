@@ -1,4 +1,5 @@
 anndata
+gitpython
 h5py
 ipykernel
 natsort

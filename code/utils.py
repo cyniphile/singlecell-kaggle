@@ -1,3 +1,8 @@
+from genericpath import isdir
+from multiprocessing.sharedctypes import Value
+import os
+import pathlib
+
 import numpy as np
 import pandas as pd
 import logging
@@ -5,10 +10,30 @@ from dataclasses import dataclass
 
 logging.basicConfig(level=logging.INFO)
 
-DATA_DIR = "/Users/luke/projects/singlecell-kaggle/data/original"
-SPARSE_DATA_DIR = "/Users/luke/projects/singlecell-kaggle/data/sparse"
-OUTPUT_DIR = "/Users/luke/projects/singlecell-kaggle/data/submissions"
+import git
 
+def get_git_root():
+    lastcwd=os.getcwd()
+    while not os.path.isdir('.git'):
+        os.chdir('..')
+        cwd=os.getcwd()
+        if cwd == lastcwd:
+            raise OSError('no .git directory')
+        lastcwd=cwd
+    return lastcwd
+
+# Original data.
+DATA_DIR = pathlib.Path(get_git_root()) / "data" / "original"
+
+# Sparse data dir.
+SPARSE_DATA_DIR = pathlib.Path(get_git_root()) / "data" / "sparse"
+
+# Output data dir.
+OUTPUT_DIR = pathlib.Path(get_git_root()) / "data" / "submissions"
+
+for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
+    if not path.is_dir():
+        raise ValueError(f"directory not found: f{path}")
 
 @dataclass
 class ExperimentRepository:
