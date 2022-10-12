@@ -79,3 +79,22 @@ def format_submission(Y_pred_raw, tech: Technology):
         eval_ids_gene_num[valid_multi_rows].to_numpy()  # type: ignore
     ]
     return submission
+
+
+def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    TODO: write unit test for this
+    Scores the predictions according to the competition rules. 
+    It is assumed that the predictions are not constant.
+    Returns the average of each sample's Pearson correlation coefficient
+
+    take (lightly modified) from: 
+    https://www.kaggle.com/code/ambrosm/msci-multiome-quickstart?scriptVersionId=103802624&cellId=7
+    """
+    if y_true.shape != y_pred.shape:
+        raise ValueError(
+            f"Shapes are different. {y_true.shape} != {y_pred.shape}")
+    corr_sum = 0
+    for i in range(len(y_true)):
+        corr_sum += np.corrcoef(y_true[i], y_pred[i])[1, 0]
+    return corr_sum / len(y_true)

@@ -1,3 +1,7 @@
+# 10/12
+
+Probably biggest blocker to making another submission with the RBF kernel is local CV. Only problem is CV is very expensive, and it's hard/expensive to even train one model. The public kaggle notebooks seem to just downsample aggressively, and the RBF solution from last year did this as well. 
+
 # 10/11
 
 Today I'd like to get one of the winners from last year working. Their approach was simple-ish, and was for CITE data, which is both easier to work with and more important for scoring. Code here: https://github.com/openproblems-bio/neurips2021_multimodal_topmethods/tree/main/src/predict_modality/methods/Guanlab-dengkw/run
@@ -13,7 +17,7 @@ To review:
       - A: Only the Russians seem aware of this. I'm not sure what their deal is because they seem very active but also rather ineffective, with a high variance of usefulness to their many (many) posts. 
       - This notebook: https://www.kaggle.com/code/xiafire/msci-multiome-5-steps-x-5-folds-25-models Pretty heavily copied but no comments and not that many upvotes. No note of performance.
 
-Got a basic RBF kernel model working, but not on full dataset. I want to look into a slightly more automated data pipeline/experiment management system, maybe viash.
+Got a basic RBF kernel model working, but not on full dataset. I want to look into a slightly more automated data pipeline/experiment management system, maybe viash. Also really need to get local cv working; it's not a good step to skip.
 
 ----------------------
 # 10/10
