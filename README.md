@@ -53,3 +53,26 @@ A few sklearn methods are naturally multi-output (`LinearRegression` (and relate
   - how to map names: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/349559
   - Inputs: For the RNA counts, each row corresponds to a cell and each column to a gene. The column format for a gene is given by {EnsemblID}_{GeneName} where EnsemblID refers to the [Ensembl Gene ID](https://www.ebi.ac.uk/training/online/courses/ensembl-browsing-genomes/navigating-ensembl/investigating-a-gene/#:~:text=Ensembl%20gene%20IDs%20begin%20with,of%20species%20other%20than%20human) and GeneName to the gene name.
 
+## How To Run
+
+1. Install Poetry
+
+# TODO: Automate config of dev environment.
+
+```sh
+brew install poetry
+```
+
+```sh
+pyenv install 3.10.6
+```
+
+# TODO: Add a .python-version file that specifies 3.10.6.
+```sh
+poetry env use 3.10.6
+pyenv shell 3.10.6
+```
+
+```sh
+poetry install 
+```

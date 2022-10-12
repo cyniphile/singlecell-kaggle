@@ -11,7 +11,7 @@ OUTPUT_DIR = "/Users/luke/projects/singlecell-kaggle/data/submissions"
 
 
 @dataclass
-class Technology:
+class ExperimentRepository:
     name: str
 
     def __post_init__(self):
@@ -26,21 +26,25 @@ class Technology:
         self.test_inputs_sparse_idxcol_path: str = f"{SPARSE_DATA_DIR}/test_{self.name}_inputs_idxcol.npz"
 
 
-multi = Technology("multi")
-cite = Technology("cite")
+multi = ExperimentRepository("multi")
+cite = ExperimentRepository("cite")
 
 
-def format_submission(Y_pred_raw, tech: Technology):
+def format_submission(Y_pred_raw, repo: ExperimentRepository):
     """
     Takes a square matrix of `gene*cell` of the kind usually output
     from models and formats it as necessary for submission to the 
     kaggle competition
     """
     logging.info('Loading indices...')
-    test_index = np.load(tech.test_inputs_sparse_idxcol_path,
-                         allow_pickle=True)["index"]
-    y_columns = np.load(tech.train_inputs_sparse_idxcol_path,
-                        allow_pickle=True)["columns"]
+    test_index = np.load(
+        repo.test_inputs_sparse_idxcol_path,
+        allow_pickle=True,
+    )["index"]
+    y_columns = np.load(
+        repo.train_inputs_sparse_idxcol_path,
+        allow_pickle=True,
+    )["columns"]
 
     # Maps from row number to cell_id
     cell_dict = dict((k, i) for i, k in enumerate(test_index))
