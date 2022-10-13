@@ -10,17 +10,17 @@ from dataclasses import dataclass
 
 logging.basicConfig(level=logging.INFO)
 
-import git
 
 def get_git_root():
-    lastcwd=os.getcwd()
+    last_cwd = os.getcwd()
     while not os.path.isdir('.git'):
         os.chdir('..')
-        cwd=os.getcwd()
-        if cwd == lastcwd:
+        cwd = os.getcwd()
+        if cwd == last_cwd:
             raise OSError('no .git directory')
-        lastcwd=cwd
-    return lastcwd
+        last_cwd = cwd
+    return last_cwd
+
 
 # Original data.
 DATA_DIR = pathlib.Path(get_git_root()) / "data" / "original"
@@ -34,6 +34,7 @@ OUTPUT_DIR = pathlib.Path(get_git_root()) / "data" / "submissions"
 for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
     if not path.is_dir():
         raise ValueError(f"directory not found: f{path}")
+
 
 @dataclass
 class ExperimentRepository:
@@ -50,7 +51,7 @@ class ExperimentRepository:
         self.train_targets_sparse_idxcol_path: str = f"{SPARSE_DATA_DIR}/train_{self.name}_targets_idxcol.npz"
         self.test_inputs_sparse_idxcol_path: str = f"{SPARSE_DATA_DIR}/test_{self.name}_inputs_idxcol.npz"
 
-
+# TODO: rename
 multi = ExperimentRepository("multi")
 cite = ExperimentRepository("cite")
 
@@ -67,7 +68,7 @@ def format_submission(Y_pred_raw, repo: ExperimentRepository):
         allow_pickle=True,
     )["index"]
     y_columns = np.load(
-        repo.train_inputs_sparse_idxcol_path,
+        repo.train_targets_sparse_idxcol_path,
         allow_pickle=True,
     )["columns"]
 
