@@ -1,4 +1,19 @@
 https://www.kaggle.com/competitions/open-problems-multimodal/
+## How To Run
+ <!-- TODO: setup virtual env not using poetry -->
+1. 
+```sh
+pyenv install 3.10.6
+```
+```sh
+pip install -r requirements.txt
+```
+ <!-- TODO: Instructions on where to download and extract. -->
+2. Download [the dataset](https://www.kaggle.com/competitions/open-problems-multimodal/data) and extract to `data/original`.
+3. Download [sparse dataset](https://www.kaggle.com/datasets/fabiencrom/multimodal-single-cell-as-sparse-matrix) and extract to `data/sparse`
+
+4. Run basic tests `./test.sh`
+
 
 ## To study
 ~~- Competition announcement [twitter thread](https://twitter.com/dbburkhardt/status/1559304603933589504)~~
@@ -53,15 +68,3 @@ A few sklearn methods are naturally multi-output (`LinearRegression` (and relate
   - how to map names: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/349559
   - Inputs: For the RNA counts, each row corresponds to a cell and each column to a gene. The column format for a gene is given by {EnsemblID}_{GeneName} where EnsemblID refers to the [Ensembl Gene ID](https://www.ebi.ac.uk/training/online/courses/ensembl-browsing-genomes/navigating-ensembl/investigating-a-gene/#:~:text=Ensembl%20gene%20IDs%20begin%20with,of%20species%20other%20than%20human) and GeneName to the gene name.
 
-## How To Run
-
-# TODO setup virtual env not using poetry
-```sh
-pyenv install 3.10.6
-```
-
-# TODO: Instructions on where to download and extract.
-2. Download the dataset and extract to `data`.
-
-
-3. Run basic tests `./test.sh`
