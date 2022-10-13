@@ -1,0 +1,9 @@
+anndata
+h5py
+ipykernel
+natsort
+numpy
+packaging
+pandas
+scipy
+sklearn
