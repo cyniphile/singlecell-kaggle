@@ -51,6 +51,7 @@ class ExperimentRepository:
         self.train_targets_sparse_idxcol_path: str = f"{SPARSE_DATA_DIR}/train_{self.name}_targets_idxcol.npz"
         self.test_inputs_sparse_idxcol_path: str = f"{SPARSE_DATA_DIR}/test_{self.name}_inputs_idxcol.npz"
 
+
 # TODO: rename
 multi = ExperimentRepository("multi")
 cite = ExperimentRepository("cite")
@@ -128,3 +129,14 @@ def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     for i in range(len(y_true)):
         corr_sum += np.corrcoef(y_true[i], y_pred[i])[1, 0]
     return corr_sum / len(y_true)
+
+
+def test_valid_submission(submission: pd.DataFrame):
+    """
+    Checks that a submission dataframe is properly formatted for submission
+    to Kaggle
+    """
+    assert submission.index.name == 'row_id'
+    assert submission.columns == ['target']
+    assert len(submission) == 65744180
+    assert submission['target'].isna().sum() == 0
