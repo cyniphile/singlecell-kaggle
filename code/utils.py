@@ -4,6 +4,7 @@ import pathlib
 import typing
 
 import numpy as np
+import scipy as sp
 import pandas as pd
 import logging
 from dataclasses import dataclass
@@ -212,7 +213,7 @@ def load_hdf_data(experiment: ExperimentParameters):
     """
     Load all `.hd5` datasets needed for a given Experiment
     """
-    logging.info('Reading `h5ad` files...')
+    logging.info('Reading `h5d` files...')
     # TODO: extract to method with params  (sparse/dense, technology)
     inputs_train = pd.read_hdf(
         experiment.TECHNOLOGY.train_inputs_path,
@@ -227,6 +228,35 @@ def load_hdf_data(experiment: ExperimentParameters):
     if experiment.OUTPUT_SUBMISSION:
         inputs_test = pd.read_hdf(
             experiment.TECHNOLOGY.test_inputs_path,
+        )
+    else:
+        inputs_test = pd.read_hdf(
+            experiment.TECHNOLOGY.test_inputs_path,
+            start=0,
+            stop=experiment.MAX_ROWS_TRAIN
+        )
+    return Datasets(inputs_train, targets_train, inputs_test)
+
+
+def load_sparse_values_data(experiment: ExperimentParameters):
+    """
+    Load all `.values.sparse.npz datasets needed for a given Experiment
+    Since sklearn algorithms generally don't allow sparse data for targets
+    need to continue to just use sparse data there. 
+    """
+    logging.info('Reading `.sparse.npz` files...')
+    inputs_train = sp.sparse.load_npz(
+        experiment.TECHNOLOGY.train_inputs_sparse_values_path
+    )
+    logging.info('Reading `hd5 targets` files...')
+    targets_train = pd.read_hdf(
+        experiment.TECHNOLOGY.train_targets_path,
+        start=0,
+        stop=experiment.MAX_ROWS_TRAIN
+    )
+    if experiment.OUTPUT_SUBMISSION:
+        inputs_test = sp.sparse.load_npz(
+            experiment.TECHNOLOGY.test_inputs_sparse_values_path
         )
     else:
         inputs_test = pd.read_hdf(
