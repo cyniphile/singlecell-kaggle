@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 cd code
 # Will not work on windows as dumps temporary notebook to /dev/null	
