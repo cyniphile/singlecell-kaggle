@@ -1,5 +1,4 @@
 anndata
-gitpython
 h5py
 ipykernel
 natsort
@@ -8,4 +7,3 @@ packaging
 pandas
 scipy
 sklearn
-pippip

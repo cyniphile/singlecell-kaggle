@@ -14,24 +14,14 @@ asttokens==2.0.8
     # via stack-data
 backcall==0.2.0
     # via ipython
-certifi==2022.9.24
-    # via pipenv
 debugpy==1.6.3
     # via ipykernel
 decorator==5.1.1
     # via ipython
-distlib==0.3.6
-    # via virtualenv
 entrypoints==0.4
     # via jupyter-client
 executing==1.1.1
     # via stack-data
-filelock==3.8.0
-    # via virtualenv
-gitdb==4.0.9
-    # via gitpython
-gitpython==3.1.29
-    # via -r requirements.in
 h5py==3.7.0
     # via
     #   -r requirements.in
@@ -83,12 +73,6 @@ pexpect==4.8.0
     # via ipython
 pickleshare==0.7.5
     # via ipython
-pipenv==2022.10.11
-    # via pippip
-pippip==0.0.10
-    # via -r requirements.in
-platformdirs==2.5.2
-    # via virtualenv
 prompt-toolkit==3.0.31
     # via ipython
 psutil==5.9.2
@@ -122,8 +106,6 @@ six==1.16.0
     # via python-dateutil
 sklearn==0.0
     # via -r requirements.in
-smmap==5.0.0
-    # via gitdb
 stack-data==0.5.1
     # via ipython
 threadpoolctl==3.1.0
@@ -139,12 +121,5 @@ traitlets==5.4.0
     #   jupyter-client
     #   jupyter-core
     #   matplotlib-inline
-virtualenv==20.16.5
-    # via pipenv
-virtualenv-clone==0.5.7
-    # via pipenv
 wcwidth==0.2.5
     # via prompt-toolkit
-
-# The following packages are considered to be unsafe in a requirements file:
-# setuptools
