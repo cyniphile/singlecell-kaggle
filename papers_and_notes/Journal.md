@@ -1,3 +1,4 @@
+
 # 10/17
 
 I'm feeling like the next step is to set up local background hyperparam optimization and tracking local cv with submission more automatically. Again, papermill will be good at this. This is my goal for
@@ -5,6 +6,22 @@ I'm feeling like the next step is to set up local background hyperparam optimiza
 I think the next big step is to try using previous-day output as an input. Given the size of the data, using huge, all-data models is not really feasible anyway, and I'm getting decent scores using only 25k rows (roughly 25-35% of data). It seems like scores were asymptoting as I added more rows of training data. Also, I didn't properly randomize data (was just taking data from the top of the file) so maybe there was even some ordering I was not taking into account for. I'm guessing using more data + hyperparam optimization would get me into the .81 score range (.802 now). 
 
 When using previous day input, I think the question is whether to use two models in ensemble, or train one big model. TODO: Probably want to start with the two model approach to see if the, say, Day 1 -> Day 2 protein model does anything useful on its own!
+
+*Review of pipeline tools*
+https://achernov.medium.com/mlops-task-and-workflow-orchestration-tools-on-kubernetes-adba3020d2bc
+
+Looking at documentation of all these dang tools for hours led me to 
+choose [ZenML](https://github.com/zenml-io/zenml) as a pipelining tool.
+- It seems decently popular. 2.4k stars on GH
+- The docs make the most sense quickest. 
+- It integrates easily with MLFlow
+- It supports caching.
+- It's oss, fairly light-weight.
+However, I found on trying to install it only works with python 3.9 (this project is 3.10). So I went with prefect. 
+
+[MLFlow](https://github.com/mlflow/mlflow/) seems standard and hugely popular, and not too hard to integrate so gonna use that for experiment tracking.  
+
+
 
 # 10/15 - 10/16
 Didn't make much progress on setting up a good pipelining tool last friday. Tried building something, but realized there _has_ to be something out there, so doing research on that (so far `dagster` looking promising.) 
