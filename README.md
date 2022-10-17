@@ -55,27 +55,13 @@ A few sklearn methods are naturally multi-output (`LinearRegression` (and relate
 
 ## How To Run
 
-1. Install Poetry
-
-# TODO: Automate config of dev environment.
-
-```sh
-brew install poetry
-```
-
+# TODO setup virtual env not using poetry
 ```sh
 pyenv install 3.10.6
 ```
 
-# TODO: Add a .python-version file that specifies 3.10.6.
-```sh
-poetry env use 3.10.6
-pyenv shell 3.10.6
-```
-
-```sh
-poetry install 
-```
-
 # TODO: Instructions on where to download and extract.
 2. Download the dataset and extract to `data`.
+
+
+3. Run basic tests `./test.sh`
