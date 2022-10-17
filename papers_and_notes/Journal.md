@@ -1,3 +1,25 @@
+# 10/17
+
+I'm feeling like the next step is to set up local background hyperparam optimization and tracking local cv with submission more automatically. Again, papermill will be good at this. This is my goal for
+
+I think the next big step is to try using previous-day output as an input. Given the size of the data, using huge, all-data models is not really feasible anyway, and I'm getting decent scores using only 25k rows (roughly 25-35% of data). It seems like scores were asymptoting as I added more rows of training data. Also, I didn't properly randomize data (was just taking data from the top of the file) so maybe there was even some ordering I was not taking into account for. I'm guessing using more data + hyperparam optimization would get me into the .81 score range (.802 now). 
+
+When using previous day input, I think the question is whether to use two models in ensemble, or train one big model. TODO: Probably want to start with the two model approach to see if the, say, Day 1 -> Day 2 protein model does anything useful on its own!
+
+# 10/15 - 10/16
+Didn't make much progress on setting up a good pipelining tool last friday. Tried building something, but realized there _has_ to be something out there, so doing research on that (so far `dagster` looking promising.) 
+
+Also did some review of RBF kernel. It's complex, and not something to easily pick up expert-level theory (would probably take a couple full days, maybe more if I were to really learn Lagrangians as I've been wanting to do for years anyway.) I think the main thing to remember is that the `gamma` param is a sort of "number of model parameters" god param, so bigger gamma means lower regularization/fewer params. See: https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
+
+
+# 10/14
+Continuing with this idea: I started using `papermill` (which I've been wanting to use for awhile). I got it set up to run a quick "unit test" of a notebook, which has been really useful. Would be good to parameterize 'my' notebooks further (also using `scrapbook` for outputs, and the kaggle api for processing). I also want to save intermediately processed data, (like pca) more automatically and idempotently. 
+
+# 10/13
+Should really do this every day, but catching up now. Ran a couple models: 1) a larger CITE model and 2) and the same RBF model on multi data to get a stronger benchmark on the LB. Also tooled a bit on making the notebook model more technology agnostic, mostly because multi really requires using sparse matrix inputs. 
+
+Improved model score to 0.802 (99% of current winning score), but not done anything that interesting so far. Clearly there are non-linearities as RBF has improved everything over linear modeling. Not tuned hyperparams at all yet either.
+
 # 10/12
 
 Probably biggest blocker to making another submission with the RBF kernel is local CV. Only problem is CV is very expensive, and it's hard/expensive to even train one model. The public kaggle notebooks seem to just downsample aggressively, and the RBF solution from last year did this as well. 
@@ -5,7 +27,6 @@ Probably biggest blocker to making another submission with the RBF kernel is loc
 Paired with @jasotron today and did a lot of code refactoring. 
 
 Today need to 1) merge his branch, 2) finalize a system to keep track of performance locally (submit via api and centralize experiment data)
-
 # 10/11
 
 Today I'd like to get one of the winners from last year working. Their approach was simple-ish, and was for CITE data, which is both easier to work with and more important for scoring. Code here: https://github.com/openproblems-bio/neurips2021_multimodal_topmethods/tree/main/src/predict_modality/methods/Guanlab-dengkw/run
@@ -76,7 +97,6 @@ https://www.kaggle.com/code/ambrosm/msci-eda-which-makes-sense/notebook#EDA-for-
   - 53:00 Not as applicable to current competition and stopped watching
 
 ----------------------
-
 # 10/8
 
 I think now it's time to go back and do a more through review of public notebooks on kaggle. 
