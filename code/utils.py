@@ -1,9 +1,10 @@
-from genericpath import isdir
-from multiprocessing.sharedctypes import Value
+from typing import List
 import os
 import pathlib
+import typing
 
 import numpy as np
+import scipy as sp
 import pandas as pd
 import logging
 from dataclasses import dataclass
@@ -22,22 +23,28 @@ def get_git_root():
     return last_cwd
 
 
-# Original data.
-DATA_DIR = pathlib.Path(get_git_root()) / "data" / "original"
+project_root = pathlib.Path(get_git_root())
+
+# Original data from kaggle.
+DATA_DIR = project_root / "data" / "original"
 
 # Sparse data dir.
-SPARSE_DATA_DIR = pathlib.Path(get_git_root()) / "data" / "sparse"
+SPARSE_DATA_DIR = project_root / "data" / "sparse"
 
-# Output data dir.
-OUTPUT_DIR = pathlib.Path(get_git_root()) / "data" / "submissions"
+# Predictions Output data dir.
+OUTPUT_DIR = project_root / "data" / "submissions"
 
-for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
+# Predictions Output data dir.
+REDUCED_DIR = project_root / "data" / "reduced"
+
+
+for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR, REDUCED_DIR]:
     if not path.is_dir():
         raise ValueError(f"directory not found: f{path}")
 
 
 @dataclass
-class ExperimentRepository:
+class TechnologyRepository:
     name: str
 
     def __post_init__(self):
@@ -52,15 +59,14 @@ class ExperimentRepository:
         self.test_inputs_sparse_idxcol_path: str = f"{SPARSE_DATA_DIR}/test_{self.name}_inputs_idxcol.npz"
 
 
-# TODO: rename
-multi = ExperimentRepository("multi")
-cite = ExperimentRepository("cite")
+multi = TechnologyRepository("multi")
+cite = TechnologyRepository("cite")
 
 
-def format_submission(Y_pred_raw, repo: ExperimentRepository):
+def format_submission(Y_pred_raw, repo: TechnologyRepository):
     """
     Takes a square matrix of `gene*cell` of the kind usually output
-    from models and formats it as necessary for submission to the 
+    from models and formats it as necessary for submission to the
     kaggle competition
     """
     logging.info('Loading indices...')
@@ -115,11 +121,11 @@ def format_submission(Y_pred_raw, repo: ExperimentRepository):
 def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """
     TODO: write unit test for this
-    Scores the predictions according to the competition rules. 
+    Scores the predictions according to the competition rules.
     It is assumed that the predictions are not constant.
     Returns the average of each sample's Pearson correlation coefficient
 
-    take (lightly modified) from: 
+    take (lightly modified) from:
     https://www.kaggle.com/code/ambrosm/msci-multiome-quickstart?scriptVersionId=103802624&cellId=7
     """
     if y_true.shape != y_pred.shape:
@@ -140,3 +146,126 @@ def test_valid_submission(submission: pd.DataFrame):
     assert submission.columns == ['target']
     assert len(submission) == 65744180
     assert submission['target'].isna().sum() == 0
+
+
+def row_wise_std_scaler(M):
+    """
+    Standard scale values by row.
+    Sklearn StandardScaler has now row-wise option
+    """
+    std = np.std(M, axis=1).reshape(-1, 1)
+    # Make any zero std 1 to avoid numerical problems
+    std[std == 0] = 1
+    mean = np.mean(M, axis=1).reshape(-1, 1)
+    return (M - mean) / std
+
+
+@dataclass
+class Score:
+    score: float
+
+
+@dataclass
+class ScoreSummary:
+    scores: List[Score]
+
+
+@dataclass
+class ExperimentParameters:
+    """
+    Base class that holds experiment parameters
+    Extensible to hold other parameters as necessary
+    """
+    # Number of rows to sample from data
+    MAX_ROWS_TRAIN: int
+    # Whether to create a full submission
+    OUTPUT_SUBMISSION: bool
+    # The "technology" (cite or multi) to perform the modeling experiment on
+    TECHNOLOGY: TechnologyRepository
+    NP_RANDOM_SEED = 1000
+
+
+# Begin mixins to extend ExperimentParameters
+
+
+@dataclass
+class PCAInputs:
+    INPUTS_PCA_DIMS: int
+
+
+@dataclass
+class PCATargets:
+    TARGETS_PCA_DIMS: int
+
+
+@dataclass
+class KFold:
+    K_FOLDS: int
+
+# End Stub classes to extend ExperimentParameters
+
+
+@dataclass
+class Datasets:
+    """
+    Holds three basic datasets necessary for an experiment
+    """
+    inputs_train: typing.Any
+    targets_train: typing.Any
+    inputs_test: typing.Any
+
+
+def load_hdf_data(experiment: ExperimentParameters):
+    """
+    Load all `.hd5` datasets needed for a given Experiment
+    """
+    logging.info('Reading `h5d` files...')
+    # TODO: extract to method with params  (sparse/dense, technology)
+    inputs_train = pd.read_hdf(
+        experiment.TECHNOLOGY.train_inputs_path,
+        start=0,
+        stop=experiment.MAX_ROWS_TRAIN
+    )
+    targets_train = pd.read_hdf(
+        experiment.TECHNOLOGY.train_targets_path,
+        start=0,
+        stop=experiment.MAX_ROWS_TRAIN
+    )
+    if experiment.OUTPUT_SUBMISSION:
+        inputs_test = pd.read_hdf(
+            experiment.TECHNOLOGY.test_inputs_path,
+        )
+    else:
+        inputs_test = pd.read_hdf(
+            experiment.TECHNOLOGY.test_inputs_path,
+            start=0,
+            stop=experiment.MAX_ROWS_TRAIN
+        )
+    return Datasets(inputs_train, targets_train, inputs_test)
+
+
+def load_sparse_values_data(experiment: ExperimentParameters):
+    """
+    Load all `.values.sparse.npz datasets needed for a given Experiment
+    Since sklearn algorithms generally don't allow sparse data for targets
+    need to continue to just use sparse data there.
+    """
+    logging.info('Reading `.sparse.npz` files...')
+    inputs_train = sp.sparse.load_npz(
+        experiment.TECHNOLOGY.train_inputs_sparse_values_path
+    )[:experiment.MAX_ROWS_TRAIN]
+    logging.info('Reading `hd5 targets` files...')
+    targets_train = pd.read_hdf(
+        experiment.TECHNOLOGY.train_targets_path,
+        start=0,
+        stop=experiment.MAX_ROWS_TRAIN
+    )
+    if experiment.OUTPUT_SUBMISSION:
+        inputs_test = sp.sparse.load_npz(
+            experiment.TECHNOLOGY.test_inputs_sparse_values_path
+        )
+    else:
+        inputs_test = sp.sparse.load_npz(
+            experiment.TECHNOLOGY.test_inputs_sparse_values_path
+        )[:experiment.MAX_ROWS_TRAIN]
+    return Datasets(inputs_train, targets_train, inputs_test)

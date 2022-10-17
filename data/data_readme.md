@@ -1,12 +1,14 @@
 ## Cite-seq 
- train_cite_inputs.h5 | features (rna genes)
- train_cite_targets.h5 | targets (protein genes)
- test_cite_inputs.h5 | test features
+ train_cite_inputs.h5 | features (rna genes) 70_988 * 22_050
+ train_cite_targets.h5 | targets (protein genes) 70_988 * 140 cols
+ test_cite_inputs.h5 | test features 48663 * 22050
 
 ## Multiome
- train_multi_targets.h5 | features
- train_multi_inputs.h5 | labels
- test_multi_inputs.h5 | test features
+ train_multi_targets.h5 | features 105942 * 228942
+ train_multi_inputs.h5 | labels 105942 * 23418
+ test_multi_inputs.h5 | test features 55935 * 228942
+
+
 
 ## Meta
  evaluation_ids.csv | A map from `cell_id` X `gene_id` -> `row_id`
