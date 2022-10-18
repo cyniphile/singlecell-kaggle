@@ -5,9 +5,8 @@ description = ""
 authors = ["Luke Schiefelbein <luke.schiefelbein@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.11"
 papermill = "^2.4.0"
-mypy = "^0.982"
 h5py = "^3.7.0"
 ipykernel = "^6.16.0"
 natsort = "^8.2.0"
@@ -17,8 +16,12 @@ pandas = "^1.5.0"
 scipy = "^1.9.2"
 sklearn = "^0.0"
 prefect = "^2.6.1"
+tables = "^3.7.0"
 
 [tool.poetry.dev-dependencies]
+pandas-stubs = "^1.5.0"
+mypy = "^0.982"
+autopep8 = "^1.7.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
