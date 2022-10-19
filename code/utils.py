@@ -179,38 +179,6 @@ class ScoreSummary:
 
 
 @dataclass
-class ExperimentParameters:
-    """
-    Base class that holds experiment parameters
-    Extensible to hold other parameters as necessary
-    """
-
-    # Number of rows to sample from data
-    MAX_ROWS_TRAIN: int
-    # Whether to create a full submission
-    OUTPUT_SUBMISSION: bool
-    # The "technology" (cite or multi) to perform the modeling experiment on
-    TECHNOLOGY: TechnologyRepository
-    NP_RANDOM_SEED = 1000
-
-
-# Begin mixins to extend ExperimentParameters
-
-
-@dataclass
-class PCAInputs:
-    INPUTS_PCA_DIMS: int
-
-
-@dataclass
-class PCATargets:
-    TARGETS_PCA_DIMS: int
-
-
-# End Stub classes to extend ExperimentParameters
-
-
-@dataclass
 class Datasets:
     """
     Holds three basic datasets necessary for an experiment
@@ -222,7 +190,6 @@ class Datasets:
 
 
 # Prefect functions
-
 
 def load_data(
     *,
@@ -238,7 +205,7 @@ def load_data(
 
 
 @task
-def load_inputs_train(*, technology: TechnologyRepository, **kwargs):
+def load_train_inputs(*, technology: TechnologyRepository, **kwargs):
     return load_data(
         path=technology.train_inputs_path,
         path_sparse=technology.train_inputs_sparse_values_path,
@@ -247,7 +214,7 @@ def load_inputs_train(*, technology: TechnologyRepository, **kwargs):
 
 
 @task
-def load_targets_train(*, technology: TechnologyRepository, **kwargs):
+def load_train_targets(*, technology: TechnologyRepository, **kwargs):
     return load_data(
         path=technology.train_targets_path,
         path_sparse=technology.train_targets_sparse_values_path,
@@ -256,7 +223,7 @@ def load_targets_train(*, technology: TechnologyRepository, **kwargs):
 
 
 @task
-def load_inputs_test(*, technology: TechnologyRepository, **kwargs):
+def load_test_inputs(*, technology: TechnologyRepository, **kwargs):
     return load_data(
         path=technology.test_inputs_path,
         path_sparse=technology.test_inputs_sparse_values_path,
@@ -271,16 +238,16 @@ def load_all_data(
     submit_to_kaggle: bool,
     sparse: bool,
 ):
-    inputs_train = load_inputs_test(
+    inputs_train = load_test_inputs(
         technology=technology, max_rows_train=max_rows_train, sparse=sparse
     )
-    targets_train = load_targets_train(
+    targets_train = load_train_targets(
         technology=technology, max_rows_train=max_rows_train
     )
     if submit_to_kaggle:
-        inputs_test = load_inputs_test(technology=technology, sparse=sparse)
+        inputs_test = load_test_inputs(technology=technology, sparse=sparse)
     else:
-        inputs_test = load_inputs_test(
+        inputs_test = load_test_inputs(
             technology=technology, max_rows_train=max_rows_train, sparse=sparse
         )
     return Datasets(inputs_train, targets_train, inputs_test)
@@ -302,22 +269,22 @@ def truncated_pca(
 
 @flow
 def pca_inputs(
-    inputs_train, inputs_test, n_components: int, return_model: bool = False
+    train_inputs, test_inputs, n_components: int, return_model: bool = False
 ):
     """
     Stack all input data (including testing inputs) and do PCA on
     everything. Useful since this is not a kernel competition and
     don't need the model to predict on unseen inputs.
     """
-    inputs = sp.sparse.vstack([inputs_train, inputs_test])
-    assert inputs.shape[0] == inputs_train.shape[0] + inputs_test.shape[0]
+    inputs = sp.sparse.vstack([train_inputs, test_inputs])
+    assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
     reduced_values, pca_model = truncated_pca(inputs, n_components, return_model)  # type: ignore
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
-    pca_train_inputs = reduced_values[: inputs_train.shape[0]]  # type: ignore
+    pca_train_inputs = reduced_values[: train_inputs.shape[0]]  # type: ignore
     # Last len(input_test) rows are input_test
-    pca_test_inputs = reduced_values[inputs_train.shape[0] :]  # type: ignore
+    pca_test_inputs = reduced_values[train_inputs.shape[0] :]  # type: ignore
     assert (
         pca_train_inputs.shape[0]
         + pca_test_inputs.shape[0]
