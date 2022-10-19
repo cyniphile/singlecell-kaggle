@@ -6,15 +6,12 @@ import typing
 import numpy as np
 import scipy as sp  # type: ignore
 import pandas as pd
-import logging
 from dataclasses import dataclass
-from prefect import flow, task
+from prefect import flow, task, get_run_logger
 from typing import Optional
 
 from sklearn.model_selection import KFold  # type: ignore
 from sklearn.decomposition import TruncatedSVD  # type: ignore
-
-logging.basicConfig(level=logging.INFO)
 
 
 def get_git_root():
@@ -86,7 +83,8 @@ def format_submission(Y_pred_raw, repo: TechnologyRepository):
     from models and formats it as necessary for submission to the
     kaggle competition
     """
-    logging.info("Loading indices...")
+    logger = get_run_logger()
+    logger.info("Loading indices...")
     test_index = np.load(
         repo.test_inputs_sparse_idxcol_path,
         allow_pickle=True,
@@ -104,7 +102,7 @@ def format_submission(Y_pred_raw, repo: TechnologyRepository):
 
     assert len(y_columns) == Y_pred_raw.shape[1]
     assert len(test_index) == Y_pred_raw.shape[0]
-    logging.info("Loading evaluation ids...")
+    logger.info("Loading evaluation ids...")
     eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
 
     # Create two arrays of indices, so that for every row in long `eval_ids`
@@ -119,7 +117,7 @@ def format_submission(Y_pred_raw, repo: TechnologyRepository):
     submission = pd.Series(
         name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
     )
-    logging.info("Final step: fill empty submission df...")
+    logger.info("Final step: fill empty submission df...")
     # Neat numpy trick to make a 1d array from 2d based on two arrays:
     # one of "x" coordinates and one of "y" coordinates of the 2d array.
     submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
@@ -223,60 +221,6 @@ class Datasets:
     inputs_test: typing.Any
 
 
-def load_hdf_data(experiment: ExperimentParameters):
-    """
-    Load all `.hd5` datasets needed for a given Experiment
-    """
-    logging.info("Reading `h5d` files...")
-    # TODO: extract to method with params  (sparse/dense, technology)
-    inputs_train = pd.read_hdf(
-        experiment.TECHNOLOGY.train_inputs_path, start=0, stop=experiment.MAX_ROWS_TRAIN
-    )
-    targets_train = pd.read_hdf(
-        experiment.TECHNOLOGY.train_targets_path,
-        start=0,
-        stop=experiment.MAX_ROWS_TRAIN,
-    )
-    if experiment.OUTPUT_SUBMISSION:
-        inputs_test = pd.read_hdf(
-            experiment.TECHNOLOGY.test_inputs_path,
-        )
-    else:
-        inputs_test = pd.read_hdf(
-            experiment.TECHNOLOGY.test_inputs_path,
-            start=0,
-            stop=experiment.MAX_ROWS_TRAIN,
-        )
-    return Datasets(inputs_train, targets_train, inputs_test)
-
-
-def load_sparse_values_data(experiment: ExperimentParameters):
-    """
-    Load all `.values.sparse.npz datasets needed for a given Experiment
-    Since sklearn algorithms generally don't allow sparse data for targets
-    need to continue to just use sparse data there.
-    """
-    logging.info("Reading `.sparse.npz` files...")
-    inputs_train = sp.sparse.load_npz(
-        experiment.TECHNOLOGY.train_inputs_sparse_values_path
-    )[: experiment.MAX_ROWS_TRAIN]
-    logging.info("Reading `hd5 targets` files...")
-    targets_train = pd.read_hdf(
-        experiment.TECHNOLOGY.train_targets_path,
-        start=0,
-        stop=experiment.MAX_ROWS_TRAIN,
-    )
-    if experiment.OUTPUT_SUBMISSION:
-        inputs_test = sp.sparse.load_npz(
-            experiment.TECHNOLOGY.test_inputs_sparse_values_path
-        )
-    else:
-        inputs_test = sp.sparse.load_npz(
-            experiment.TECHNOLOGY.test_inputs_sparse_values_path
-        )[: experiment.MAX_ROWS_TRAIN]
-    return Datasets(inputs_train, targets_train, inputs_test)
-
-
 # Prefect functions
 
 
@@ -284,13 +228,13 @@ def load_data(
     *,
     path: str,
     path_sparse: str,
-    max_rows_test: Optional[int] = None,
+    max_rows_train: Optional[int] = None,
     sparse: bool = False,
 ):
     if sparse:
-        return sp.sparse.load_npz(path_sparse)[:max_rows_test]
+        return sp.sparse.load_npz(path_sparse)[:max_rows_train]
     else:
-        return pd.read_hdf(path, start=0, stop=max_rows_test)
+        return pd.read_hdf(path, start=0, stop=max_rows_train)
 
 
 @task
@@ -323,21 +267,21 @@ def load_inputs_test(*, technology: TechnologyRepository, **kwargs):
 @flow
 def load_all_data(
     technology: TechnologyRepository,
-    max_rows_test: int,
+    max_rows_train: int,
     submit_to_kaggle: bool,
     sparse: bool,
 ):
     inputs_train = load_inputs_test(
-        technology=technology, max_rows_test=max_rows_test, sparse=sparse
+        technology=technology, max_rows_train=max_rows_train, sparse=sparse
     )
     targets_train = load_targets_train(
-        technology=technology, max_rows_test=max_rows_test
+        technology=technology, max_rows_train=max_rows_train
     )
     if submit_to_kaggle:
         inputs_test = load_inputs_test(technology=technology, sparse=sparse)
     else:
         inputs_test = load_inputs_test(
-            technology=technology, max_rows_test=max_rows_test, sparse=sparse
+            technology=technology, max_rows_train=max_rows_train, sparse=sparse
         )
     return Datasets(inputs_train, targets_train, inputs_test)
 
@@ -397,12 +341,13 @@ def fit_and_score_pca_targets(
     performs model fit and score where model is predicting a reduced
     pca vector that needs to be converted back to raw data space
     """
+    logger = get_run_logger()
     model.fit(train_inputs, pca_train_targets)
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
     Y = pca_test_targets @ pca_model_targets.components_
     score = correlation_score(Y, Y_hat)
-    logging.info(f"Score: {score}")
+    logger.info(f"Score: {score}")
     return Score(score=score)
 
 
@@ -416,6 +361,7 @@ def k_fold_validation(
     k: int,
     **model_kwargs,
 ):
+    logger = get_run_logger()
     kf = KFold(n_splits=k)
     scores = []
     for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_inputs)):
@@ -423,7 +369,9 @@ def k_fold_validation(
         fold_train_targets = train_targets[train_indices]
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
-        score = fit_and_score_func(
+        logger.info(f"Fitting fold {fold_index}...")
+        # Use `.submit` function to make Prefect do tasks concurrently
+        score = fit_and_score_func.submit(
             fold_train_targets,
             fold_test_targets,
             fold_train_inputs,
@@ -431,5 +379,6 @@ def k_fold_validation(
             model=model,
             **model_kwargs,
         )
+        logger.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
