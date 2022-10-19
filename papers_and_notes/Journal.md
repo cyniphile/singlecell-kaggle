@@ -1,15 +1,20 @@
+# 10/18
+
+Didn't quite finish implementing data pipelining yesterday (bad, spanks, spent a little too long doing research on data tools, but damn is it a complex world. [This site](https://mymlops.com/) was very helpful in wrapping my head around it). Did get some initial work done in Prefect which actually seems great so far. 
+
+Today want to finish up the porting, get MLFlow setup as well, and test how well it all works on kaggle/saturn cloud. May need to set up [Dask integration](https://docs.prefect.io/tutorials/dask-ray-task-runners/) to get proper parallelization
+
+EOD: Finished up porting to prefect (mostly, at least was able to delete various ugly notebooks). 
 
 # 10/17
 
-I'm feeling like the next step is to set up local background hyperparam optimization and tracking local cv with submission more automatically. Again, papermill will be good at this. This is my goal for
+I'm feeling like the next step is to set up local background hyperparam optimization and tracking local cv with submission more automatically. Again, papermill will be good at this.
 
-I think the next big step is to try using previous-day output as an input. Given the size of the data, using huge, all-data models is not really feasible anyway, and I'm getting decent scores using only 25k rows (roughly 25-35% of data). It seems like scores were asymptoting as I added more rows of training data. Also, I didn't properly randomize data (was just taking data from the top of the file) so maybe there was even some ordering I was not taking into account for. I'm guessing using more data + hyperparam optimization would get me into the .81 score range (.802 now). 
+I think another goal is to try using previous-day output as an input. Given the size of the data, using huge, all-data models is not really feasible anyway, and I'm getting decent scores using only 25k rows (roughly 25-35% of data). It seems like scores were asymptoting as I added more rows of training data. Also, I didn't properly randomize data (was just taking data from the top of the file) so maybe there was even some ordering I was not taking into account for. I'm guessing using more data + hyperparam optimization would get me into the .81 score range (.802 now). 
 
-When using previous day input, I think the question is whether to use two models in ensemble, or train one big model. TODO: Probably want to start with the two model approach to see if the, say, Day 1 -> Day 2 protein model does anything useful on its own!
+When using previous day input, I think the question is whether to use two models in ensemble, or train one big model. TODO: Probably want to start with the two model approach to see if the, say, Day 1 -> Day 2 protein model does anything useful on its own! Remember there is no row-wise mapping between targets, but overall distributions might change
 
 *Review of pipeline tools*
-https://achernov.medium.com/mlops-task-and-workflow-orchestration-tools-on-kubernetes-adba3020d2bc
-
 Looking at documentation of all these dang tools for hours led me to 
 choose [ZenML](https://github.com/zenml-io/zenml) as a pipelining tool.
 - It seems decently popular. 2.4k stars on GH
@@ -17,16 +22,16 @@ choose [ZenML](https://github.com/zenml-io/zenml) as a pipelining tool.
 - It integrates easily with MLFlow
 - It supports caching.
 - It's oss, fairly light-weight.
-However, I found on trying to install it only works with python 3.9 (this project is 3.10). So I went with prefect. 
+However, I found on trying to install it only works with python 3.9 (this project is 3.10). So I went with [Prefect](https://docs.prefect.io/tutorials/first-steps/) which generally seemed to be even more liked. 
 
-[MLFlow](https://github.com/mlflow/mlflow/) seems standard and hugely popular, and not too hard to integrate so gonna use that for experiment tracking.  
+[MLFlow](https://github.com/mlflow/mlflow/) seems standard, hugely popular, and not too hard to integrate so gonna use that for experiment tracking.  
 
 
 
 # 10/15 - 10/16
 Didn't make much progress on setting up a good pipelining tool last friday. Tried building something, but realized there _has_ to be something out there, so doing research on that (so far `dagster` looking promising.) 
 
-Also did some review of RBF kernel. It's complex, and not something to easily pick up expert-level theory (would probably take a couple full days, maybe more if I were to really learn Lagrangians as I've been wanting to do for years anyway.) I think the main thing to remember is that the `gamma` param is a sort of "number of model parameters" god param, so bigger gamma means lower regularization/fewer params. See: https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
+Also did some review of RBF kernel. It's complex, and not something to easily pick up expert-level theory (would probably take a couple full days, maybe more if I were to really learn Lagrangians as I've been wanting to do for years anyway.) I think the main thing to remember is that the `gamma` param is a sort of "number of model parameters" god param, so bigger gamma means more params/less "regularization". See: https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html
 
 
 # 10/14

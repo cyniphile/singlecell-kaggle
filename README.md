@@ -21,6 +21,8 @@ If poetry is giving you issues there is also a `requirements.txt` file available
 
 4. Run basic tests `./test.sh`
 
+5. Check out run data: `prefect orion start`
+
 
 ## To study
 ~~- Competition announcement [twitter thread](https://twitter.com/dbburkhardt/status/1559304603933589504)~~
