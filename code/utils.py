@@ -330,10 +330,10 @@ def pca_inputs(
 
 @task
 def fit_and_score_pca_targets(
-    pca_train_targets,
     train_inputs: np.ndarray,
-    pca_test_targets,
+    pca_train_targets,
     test_inputs: np.ndarray,
+    pca_test_targets,
     model,
     pca_model_targets: TruncatedSVD,
 ) -> Score:
@@ -372,10 +372,10 @@ def k_fold_validation(
         logger.info(f"Fitting fold {fold_index}...")
         # Use `.submit` function to make Prefect do tasks concurrently
         score = fit_and_score_func.submit(
-            fold_train_targets,
-            fold_test_targets,
             fold_train_inputs,
+            fold_train_targets,
             fold_test_inputs,
+            fold_test_targets,
             model=model,
             **model_kwargs,
         )
