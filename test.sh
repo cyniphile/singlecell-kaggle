@@ -2,6 +2,5 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 cd code
-# Will not work on windows as dumps temporary notebook to /dev/null	
-# See https://github.com/nteract/papermill/issues/405
-papermill  Last\ Year\ RNA-\>Prot\ Test.ipynb /dev/null -p IS_TEST True --log-output
+# papermill last_year_rbf_prefect.ipynb ../code/tmp/test_output.ipynb -p IS_TEST True --log-output
+python ./rbf_pca_normed_input_output.py
