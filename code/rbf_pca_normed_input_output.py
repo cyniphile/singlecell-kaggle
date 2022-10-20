@@ -24,6 +24,7 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 @flow(
     name="RBF with Input and Target PCA",
     description="Based on last year's winner of RNA->Prot",
+    task_runner=DaskTaskRunner(),
 )
 def last_year_rbf_flow(
     max_rows_train=1000,
