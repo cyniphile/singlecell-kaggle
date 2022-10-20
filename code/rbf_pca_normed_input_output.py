@@ -28,6 +28,7 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
     task_runner=DaskTaskRunner(),
 )
 def last_year_rbf_flow(
+    # default params used for testing
     max_rows_train=1000,
     submit_to_kaggle=False,
     technology=utils.cite,
@@ -60,9 +61,9 @@ def last_year_rbf_flow(
     pca_train_inputs, pca_test_inputs, _ = pca_inputs(
         train_inputs, test_inputs, inputs_pca_dims
     )
-    pca_targets_train, pca_model_targets = truncated_pca(
+    pca_targets_train, pca_model_targets = truncated_pca.submit(
         targets_train, targets_pca_dims, return_model=True
-    )
+    ).result()
     train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)
     del pca_train_inputs
     kernel = RBF(length_scale=scale)
@@ -135,4 +136,9 @@ if __name__ == "__main__":
             max_rows_train=1_000,
         )
         # Need `.result()` as results are now asynchronous with dask
-        assert sum([s.result().score for s in score_summary.scores]) / len(score_summary.scores) > 0.9  # type: ignore
+        assert (
+            sum([s.result().score for s in score_summary.scores])  # type: ignore
+            / len(score_summary.scores)  # type: ignore
+            # Should get a reasonably high score
+            > 0.9
+        )

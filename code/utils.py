@@ -238,16 +238,16 @@ def load_all_data(
     submit_to_kaggle: bool,
     sparse: bool,
 ):
-    train_inputs = load_test_inputs(
+    train_inputs = load_test_inputs.submit(
         technology=technology, max_rows_train=max_rows_train, sparse=sparse
     )
-    targets_train = load_train_targets(
+    targets_train = load_train_targets.submit(
         technology=technology, max_rows_train=max_rows_train
     )
     if submit_to_kaggle:
-        test_inputs = load_test_inputs(technology=technology, sparse=sparse)
+        test_inputs = load_test_inputs.submit(technology=technology, sparse=sparse)
     else:
-        test_inputs = load_test_inputs(
+        test_inputs = load_test_inputs.submit(
             technology=technology, max_rows_train=max_rows_train, sparse=sparse
         )
     return Datasets(train_inputs, targets_train, test_inputs)
@@ -278,7 +278,11 @@ def pca_inputs(
     """
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
-    reduced_values, pca_model = truncated_pca(inputs, n_components, return_model)  # type: ignore
+    reduced_values, pca_model = truncated_pca.submit(
+        inputs, 
+        n_components, 
+        return_model
+    ).result() 
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
