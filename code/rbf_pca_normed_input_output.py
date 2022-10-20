@@ -1,6 +1,6 @@
 import utils
 import argparse
-from prefect_dask.task_runners import DaskTaskRunner
+from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
 
 # from prefect.client.schemas import State
 from utils import (
