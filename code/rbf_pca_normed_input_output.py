@@ -1,6 +1,10 @@
 import utils
 import argparse
+<<<<<<< HEAD
 from prefect_dask.task_runners import DaskTaskRunner
+=======
+from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
+>>>>>>> convert-to-prefect
 
 # from prefect.client.schemas import State
 from utils import (
