@@ -1,10 +1,6 @@
 import utils
 import argparse
-<<<<<<< HEAD
-from prefect_dask.task_runners import DaskTaskRunner
-=======
 from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
->>>>>>> convert-to-prefect
 
 # from prefect.client.schemas import State
 from utils import (
@@ -13,6 +9,7 @@ from utils import (
     truncated_pca,
     pca_inputs,
     load_all_data,
+    ScoreSummary,
 )
 import numpy as np
 import pandas as pd
@@ -78,7 +75,8 @@ def last_year_rbf_flow(
         k=k_folds,
         pca_model_targets=pca_model_targets,
     )
-    logger.info(f"K-Fold complete. Scores: {scores}")
+    score_summary = ScoreSummary(scores)
+    logger.info(f"K-Fold complete. Scores: {score_summary}")
 
     test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)
     del pca_test_inputs
@@ -114,7 +112,7 @@ def last_year_rbf_flow(
             utils.OUTPUT_DIR / f"{technology.name}_rbf_with_{OTHER_FILENAME}.csv"
         )
     else:
-        return scores
+        return score_summary
 
 
 if __name__ == "__main__":
@@ -133,8 +131,8 @@ if __name__ == "__main__":
             alpha=0.2,  # Regularization param. More is more regularization.
         )
     else:
-        scores = last_year_rbf_flow(  # type: ignore
+        score_summary = last_year_rbf_flow(  # type: ignore
             max_rows_train=1_000,
         )
         # Need `.result()` as results are now asynchronous with dask
-        assert sum([s.result().score for s in scores]) / len(scores) > 0.9  # type: ignore
+        assert sum([s.result().score for s in score_summary.scores]) / len(score_summary.scores) > 0.9  # type: ignore
