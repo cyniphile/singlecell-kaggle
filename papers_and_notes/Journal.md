@@ -1,12 +1,13 @@
 # 10/19
 
 Spent morning working on movie stuff and meeting with a friend. Now finishing up working out the kinks with making prefect work with dask. There is some async error going on. Goal for today to get experiment tracking with MLFlow and some automatic hyper-param optimization for smaller data. 
-
-Ran into some weird bugs with the python debugger using jupyter notebooks with the `DaskTaskRunner`. Switching to a scripts as notebooks are proving too unwieldy in this more mature phase. 
+ 
+Ran into some weird bugs with the python debugger using jupyter notebooks with the `DaskTaskRunner`. Switching to a scripts as notebooks are proving too unwieldy in this more mature phase. Then stayed up late into the researching experiment trackers as I'm getting cold feet on mlflow a bit. That said, it seems like the top choice, maybe other than WandB. ClearML also seems interesting. I'm going probably a bit to far into tool optimization, but hopefully I can not worry about tools for an ml project for a long time.
 
 # 10/18
 
 Didn't quite finish implementing data pipelining yesterday (bad, spanks, spent a little too long doing research on data tools, but damn is it a complex world. [This site](https://mymlops.com/) was very helpful in wrapping my head around it). Did get some initial work done in Prefect which actually seems great so far. 
+
 
 Today want to finish up the porting, get MLFlow setup as well, and test how well it all works on kaggle/saturn cloud. May need to set up [Dask integration](https://docs.prefect.io/tutorials/dask-ray-task-runners/) to get proper parallelization
 
