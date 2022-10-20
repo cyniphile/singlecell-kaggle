@@ -184,9 +184,9 @@ class Datasets:
     Holds three basic datasets necessary for an experiment
     """
 
-    inputs_train: typing.Any
-    targets_train: typing.Any
-    inputs_test: typing.Any
+    train_inputs: typing.Any
+    train_targets: typing.Any
+    test_inputs: typing.Any
 
 
 # Prefect functions
@@ -238,19 +238,19 @@ def load_all_data(
     submit_to_kaggle: bool,
     sparse: bool,
 ):
-    inputs_train = load_test_inputs(
+    train_inputs = load_test_inputs(
         technology=technology, max_rows_train=max_rows_train, sparse=sparse
     )
     targets_train = load_train_targets(
         technology=technology, max_rows_train=max_rows_train
     )
     if submit_to_kaggle:
-        inputs_test = load_test_inputs(technology=technology, sparse=sparse)
+        test_inputs = load_test_inputs(technology=technology, sparse=sparse)
     else:
-        inputs_test = load_test_inputs(
+        test_inputs = load_test_inputs(
             technology=technology, max_rows_train=max_rows_train, sparse=sparse
         )
-    return Datasets(inputs_train, targets_train, inputs_test)
+    return Datasets(train_inputs, targets_train, test_inputs)
 
 
 @task()
