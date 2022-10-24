@@ -1,17 +1,18 @@
 from typing import Dict, List, Tuple
+import subprocess
 import os
+import zipfile
 import pathlib
 import typing
 import mlflow  # type: ignore
 
-from datetime import timedelta
-from prefect.tasks import task_input_hash
+from dagster import asset, op
 import numpy as np
 import scipy as sp  # type: ignore
+
 # import modin.pandas as pd
 import pandas as pd
 from dataclasses import dataclass
-from prefect import flow, task, get_run_logger
 from typing import Optional
 
 from sklearn.model_selection import KFold  # type: ignore
@@ -36,15 +37,12 @@ DATA_DIR = project_root / "data" / "original"
 
 # Sparse data dir.
 SPARSE_DATA_DIR = project_root / "data" / "sparse"
-    
+
 # Predictions Output data dir.
 OUTPUT_DIR = project_root / "data" / "submissions"
 
-# Predictions Output data dir.
-REDUCED_DIR = project_root / "data" / "reduced"
 
-
-for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR, REDUCED_DIR]:
+for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
     if not path.is_dir():
         raise ValueError(f"directory not found: {path}")
 
@@ -79,7 +77,6 @@ class TechnologyRepository:
 
 multi = TechnologyRepository("multi")
 cite = TechnologyRepository("cite")
-
 
 
 def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -144,7 +141,52 @@ class Datasets:
     test_inputs: typing.Any
 
 
-# Prefect functions
+@asset
+def all_data_zip() -> None:
+    subprocess.run(["mkdir", "-p", DATA_DIR])
+    subprocess.run(
+        [
+            "kaggle",
+            "competitions",
+            "download",
+            "-c",
+            "open-problems-multimodal",
+            "-p",
+            DATA_DIR,
+        ]
+    )
+
+
+@asset(non_argument_deps={"all_data_zip"})
+def all_data_hd5s() -> None:
+    subprocess.run(["cd", DATA_DIR])
+    with zipfile.ZipFile(f"{DATA_DIR}/open-problems-multimodal.zip", "r") as zip_ref:
+        zip_ref.extractall(DATA_DIR)
+
+
+@asset
+def all_sparse_data_zip() -> None:
+    subprocess.run(["mkdir", "-p", SPARSE_DATA_DIR])
+    subprocess.run(
+        [
+            "kaggle",
+            "datasets",
+            "download",
+            "-d",
+            "fabiencrom/multimodal-single-cell-as-sparse-matrix",
+            "-p",
+            SPARSE_DATA_DIR,
+        ]
+    )
+
+
+@asset(non_argument_deps={"all_sparse_data_zip"})
+def all_sparse_data_npzs() -> None:
+    with zipfile.ZipFile(
+        f"{SPARSE_DATA_DIR}/multimodal-single-cell-as-sparse-matrix.zip", "r"
+    ) as zip_ref:
+        zip_ref.extractall(SPARSE_DATA_DIR)
+
 
 def load_data(
     *,
@@ -158,17 +200,37 @@ def load_data(
     else:
         return pd.read_hdf(path, start=0, stop=max_rows_train)
 
+def my_op_factory(
+    name="default_name",
+    ins=None,
+    **kwargs,
+):
+    """
+    Args:
+        name (str): The name of the new op.
+        ins (Dict[str, In]): Any Ins for the new op. Default: None.
 
-@task
-def load_train_inputs(*, technology: TechnologyRepository, **kwargs):
+    Returns:
+        function: The new op.
+    """
+
+    @op(name=name, ins=ins or {"start": In(Nothing)}, **kwargs)
+    def my_inner_op(**kwargs):
+        # Op logic here
+        pass
+
+    return my_inner_op
+
+@op(config_schema={"technology": TechnologyRepository})
+def load_train_inputs(**kwargs):
     return load_data(
-        path=technology.train_inputs_path,
+        path=context.op_config[technology.train_inputs_path,
         path_sparse=technology.train_inputs_sparse_values_path,
         **kwargs,
     )
 
 
-@task
+@op
 def load_train_targets(*, technology: TechnologyRepository, **kwargs):
     return load_data(
         path=technology.train_targets_path,
@@ -177,7 +239,7 @@ def load_train_targets(*, technology: TechnologyRepository, **kwargs):
     )
 
 
-@task
+@op
 def load_test_inputs(*, technology: TechnologyRepository, **kwargs):
     return load_data(
         path=technology.test_inputs_path,
@@ -186,32 +248,32 @@ def load_test_inputs(*, technology: TechnologyRepository, **kwargs):
     )
 
 
-@flow
+@op
 def load_all_data(
     technology: TechnologyRepository,
     max_rows_train: int,
     full_submission: bool,
     sparse: bool,
 ):
-    train_inputs = load_test_inputs.submit(
+    train_inputs = load_test_inputs(
         technology=technology, max_rows_train=max_rows_train, sparse=sparse
     )
     # Targets need to be in dense format for sklearn training :-(
-    targets_train = load_train_targets.submit(
+    targets_train = load_train_targets(
         technology=technology, max_rows_train=max_rows_train
     )
     # If submitting to kaggle need to load full test_inputs to generate
     # a complete and valid submission
     if full_submission:
-        test_inputs = load_test_inputs.submit(technology=technology, sparse=sparse)
+        test_inputs = load_test_inputs(technology=technology, sparse=sparse)
     else:
-        test_inputs = load_test_inputs.submit(
+        test_inputs = load_test_inputs(
             technology=technology, max_rows_train=max_rows_train, sparse=sparse
         )
     return Datasets(train_inputs, targets_train, test_inputs)
 
 
-@task
+@op
 def truncated_pca(
     dataset, n_components, return_model: bool = False
 ) -> Tuple[np.ndarray, Optional[TruncatedSVD]]:
@@ -225,7 +287,7 @@ def truncated_pca(
         return pca_features, None
 
 
-@flow
+@op
 def pca_inputs(
     train_inputs, test_inputs, n_components: int, return_model: bool = False
 ):
@@ -236,11 +298,7 @@ def pca_inputs(
     """
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
-    reduced_values, pca_model = truncated_pca.submit(
-        inputs, 
-        n_components, 
-        return_model
-    ).result() 
+    reduced_values, pca_model = truncated_pca(inputs, n_components, return_model)
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
@@ -248,16 +306,12 @@ def pca_inputs(
     # Last len(input_test) rows are input_test
     pca_test_inputs = reduced_values[train_inputs.shape[0] :]  # type: ignore
     assert (
-        pca_train_inputs.shape[0]
-        + pca_test_inputs.shape[0]
-    # Black doing weird formatting here
-    # fmt: off
-    ) == reduced_values.shape[0]  # type: ignore
-    # fmt: on
+        pca_train_inputs.shape[0] + pca_test_inputs.shape[0]
+    ) == reduced_values.shape[0]
     return pca_train_inputs, pca_test_inputs, pca_model  # type: ignore
 
 
-@task
+@op
 def fit_and_score_pca_targets(
     train_inputs: np.ndarray,
     pca_train_targets,
@@ -270,18 +324,18 @@ def fit_and_score_pca_targets(
     performs model fit and score where model is predicting a reduced
     pca vector that needs to be converted back to raw data space
     """
-    logger = get_run_logger()
+    # logger = get_run_logger()
     model.fit(train_inputs, pca_train_targets)
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
     Y = pca_test_targets @ pca_model_targets.components_
     score = correlation_score(Y, Y_hat)
     mlflow.log_metric("Score", score)
-    logger.info(f"Score: {score}")
+    # logger.info(f"Score: {score}")
     return Score(score=score)
 
 
-@flow
+@op
 def k_fold_validation(
     *,
     model,  # model object with `.fit()` and `.predict()` methods
@@ -291,7 +345,7 @@ def k_fold_validation(
     k: int,
     **model_kwargs,
 ):
-    logger = get_run_logger()
+    # logger = get_run_logger()
     kf = KFold(n_splits=k)
     scores = []
     for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_inputs)):
@@ -299,7 +353,7 @@ def k_fold_validation(
         fold_train_targets = train_targets[train_indices]
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
-        logger.info(f"Fitting fold {fold_index}...")
+        # logger.info(f"Fitting fold {fold_index}...")
         # Use `.submit` function to make Prefect do tasks concurrently
         score = fit_and_score_func.submit(
             fold_train_inputs,
@@ -309,9 +363,10 @@ def k_fold_validation(
             model=model,
             **model_kwargs,
         )
-        logger.info(f"Score {score} for fold {fold_index}")
+        # logger.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
+
 
 def format_submission(Y_pred_raw, technology: TechnologyRepository):
     """
@@ -319,8 +374,8 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
     from models and formats it as necessary for submission to the
     kaggle competition
     """
-    logger = get_run_logger()
-    logger.info("Loading indices...")
+    # logger = get_run_logger()
+    # logger.info("Loading indices...")
     test_index = np.load(
         technology.test_inputs_sparse_idxcol_path,
         allow_pickle=True,
@@ -338,7 +393,7 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
 
     assert len(y_columns) == Y_pred_raw.shape[1]
     assert len(test_index) == Y_pred_raw.shape[0]
-    logger.info("Loading evaluation ids...")
+    # logger.info("Loading evaluation ids...")
     eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
 
     # Create two arrays of indices, so that for every row in long `eval_ids`
@@ -353,7 +408,7 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
     submission = pd.Series(
         name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
     )
-    logger.info("Final step: fill empty submission df...")
+    # logger.info("Final step: fill empty submission df...")
     # Neat numpy trick to make a 1d array from 2d based on two arrays:
     # one of "x" coordinates and one of "y" coordinates of the 2d array.
     submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
@@ -363,41 +418,44 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
     return submission
 
 
-@task()
+@op
 def merge_submission(
     this_technology_predictions,
-    other_technology_predictions_filename: Optional[str], 
-    ):
-        """
-        merge predictions for a technology that are currently in memory with
-        other technology predictions on disk to make a full submission for both
-        modalities
-        """
-        # Format this experiment for submission
-        if other_technology_predictions_filename:
-            # TODO: need to read from prefect files
-            # Load other submission which includes predictions for alternate tech
-            OTHER_SUBMISSION_PATH = OUTPUT_DIR / f"{other_technology_predictions_filename}.csv"
-            other_submission = pd.read_csv(OTHER_SUBMISSION_PATH, index_col=0)
-            # drop multi-index to align with other submission
-            reindexed_submission_this = pd.DataFrame(this_technology_predictions.result().reset_index(drop=True)) # type: ignore
-            # Merge with separate predictions for other technology
-            merged = reindexed_submission_this["target"].fillna(
-                other_submission[reindexed_submission_this["target"].isna()]["target"]
-            )
-            # put into dataframe with proper column names
-            formatted_submission = pd.DataFrame(merged, columns=["target"])
-            formatted_submission.index.name = "row_id"
-            test_valid_submission(formatted_submission)
-        return this_technology_predictions.result().fillna(0) # type: ignore
+    other_technology_predictions_filename: Optional[str],
+):
+    """
+    merge predictions for a technology that are currently in memory with
+    other technology predictions on disk to make a full submission for both
+    modalities
+    """
+    # Format this experiment for submission
+    if other_technology_predictions_filename:
+        # TODO: need to read from prefect files
+        # Load other submission which includes predictions for alternate tech
+        OTHER_SUBMISSION_PATH = (
+            OUTPUT_DIR / f"{other_technology_predictions_filename}.csv"
+        )
+        other_submission = pd.read_csv(OTHER_SUBMISSION_PATH, index_col=0)
+        # drop multi-index to align with other submission
+        reindexed_submission_this = pd.DataFrame(this_technology_predictions.result().reset_index(drop=True))  # type: ignore
+        # Merge with separate predictions for other technology
+        merged = reindexed_submission_this["target"].fillna(
+            other_submission[reindexed_submission_this["target"].isna()]["target"]
+        )
+        # put into dataframe with proper column names
+        formatted_submission = pd.DataFrame(merged, columns=["target"])
+        formatted_submission.index.name = "row_id"
+        test_valid_submission(formatted_submission)
+    return this_technology_predictions.result().fillna(0)  # type: ignore
 
-@task
+
+# @task
 # Should use MLFlow data, not prefect
 # flow_context = prefect.context.get_run_context().flow_run.dict()
 def submit_to_kaggle(merged_submission, flow_context: Dict):
     # write full predictions to csv
     submission_file_name = f"{str(OUTPUT_DIR)}/{flow_context['name']}.csv"
     merged_submission.to_csv(submission_file_name)
-    os.system( 
+    os.system(
         f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{str(flow_context)}"'
     )

@@ -2,7 +2,7 @@
 
 Still trying to figure out what do about pipelining. It's brought some nice benefits, such as how it stores metadata and puts it all in a nice web ui. But it's also caused performance issues which I can't afford. I'm also afraid it's become more of a distraction than an aid (though I can chalk of some of the dev time to amortizable learning and setup, it's getting to be too much). 
 
-Today I'm gonna do a blitz to try out dagster. If I have any problems, depending on how things go I'll either just go back to where I am now (using prefect) and manually implement some things, or continue with dagster and manually implement some things. 
+Today I'm gonna do a blitz to try out dagster. If I have any problems, depending on how things go I'll either just go back to where I am now (using prefect) and manually implement some things, or continue with dagster and manually implement some things. Ok a few hours in and dagster is proving pretty annoying to work with. The main problem is all functions need to be rewritten as `ops` which is much more wonky than the simple `task`s of prefect. For example, you can't just pass arguments in to an op, you have to pass all these dicts of parameters around, which is slightly crazy...everything has to be checked at runtime then? or you have to write a seperate dataclass for each function? Some parts of dagster seem great, for example the materialization api seems to be just what I need for caching model results. 
 
 
 # 10/22-10/23

@@ -10,25 +10,26 @@ from utils import (
     Datasets,
 )
 import numpy as np
-from prefect import flow, get_run_logger
-from prefect.filesystems import LocalFileSystem
-from prefect.tasks import task_input_hash
 import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
+from dagster import graph, op
 
 # from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
 
 # By default, Prefect makes a best effort to compute a
 # table hash of the .py file in which the flow is defined to
 # automatically detect when your code changes.
-@flow(
-    name="RBF with Input and Target PCA",
-    description="Based on last year's winner of RNA->Prot",
-    persist_result=True,
-    result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
-    # task_runner=DaskTaskRunner(),
-)
+# @flow(
+#     name="RBF with Input and Target PCA",
+#     description="Based on last year's winner of RNA->Prot",
+#     persist_result=True,
+#     result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
+#     # task_runner=DaskTaskRunner(),
+# )
+
+
+@op
 def last_year_rbf_flow(
     # default params used for testing
     max_rows_train=1_000,
@@ -44,7 +45,7 @@ def last_year_rbf_flow(
     # TODO: not logging k-folds correctly
     mlflow.log_params(locals())
     mlflow.sklearn.autolog()
-    logger = get_run_logger()
+    # logger = get_run_logger()
     data: Datasets = load_all_data(
         technology=technology,
         max_rows_train=max_rows_train,
@@ -59,7 +60,7 @@ def last_year_rbf_flow(
     pca_train_inputs, pca_test_inputs, _ = pca_inputs(
         train_inputs, test_inputs, inputs_pca_dims
     )
-    pca_train_targets, pca_model_targets = truncated_pca.submit(
+    pca_train_targets, pca_model_targets = truncated_pca(
         train_targets, targets_pca_dims, return_model=True
     ).result()
     # TODO: ensure float32 is best
@@ -68,24 +69,25 @@ def last_year_rbf_flow(
     krr = KernelRidge(alpha=alpha, kernel=kernel)  # type: ignore
     if full_submission:
         test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)
-        logger.info("Fit full model on all training data")
+        # logger.info("Fit full model on all training data")
         krr.fit(train_norm, pca_train_targets)
-        logger.info("Predict on full submission inputs")
+        # logger.info("Predict on full submission inputs")
         Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
         formatted_submission = utils.format_submission(Y_hat, technology)
         return formatted_submission
     else:
         # TODO: not sure why this is slow for multi
-        scores = k_fold_validation(
-            model=krr,
-            train_inputs=train_norm,
-            train_targets=pca_train_targets,
-            fit_and_score_func=fit_and_score_pca_targets,
-            k=k_folds,
-            pca_model_targets=pca_model_targets,
-        )
-        score_summary = ScoreSummary(scores)
-        logger.info(f"K-Fold complete. Scores: {score_summary}")
+        # scores = k_fold_validation(
+        #     model=krr,
+        #     train_inputs=train_norm,
+        #     train_targets=pca_train_targets,
+        #     fit_and_score_func=fit_and_score_pca_targets,
+        #     k=k_folds,
+        #     pca_model_targets=pca_model_targets,
+        # )
+        # score_summary = ScoreSummary(scores)
+        # logger.info(f"K-Fold complete. Scores: {score_summary}")
+        pass
 
 
 if __name__ == "__main__":
@@ -94,4 +96,4 @@ if __name__ == "__main__":
     parser.add_argument("--full_submission", action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     full_submission = args.full_submission
-    submission = last_year_rbf_flow(full_submission=full_submission)
+    joblast_year_rbf_flow(full_submission=full_submission)
