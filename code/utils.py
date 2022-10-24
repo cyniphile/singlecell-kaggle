@@ -1,10 +1,14 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import os
 import pathlib
 import typing
+import mlflow  # type: ignore
 
+from datetime import timedelta
+from prefect.tasks import task_input_hash
 import numpy as np
 import scipy as sp  # type: ignore
+# import modin.pandas as pd
 import pandas as pd
 from dataclasses import dataclass
 from prefect import flow, task, get_run_logger
@@ -32,7 +36,7 @@ DATA_DIR = project_root / "data" / "original"
 
 # Sparse data dir.
 SPARSE_DATA_DIR = project_root / "data" / "sparse"
-
+    
 # Predictions Output data dir.
 OUTPUT_DIR = project_root / "data" / "submissions"
 
@@ -42,7 +46,7 @@ REDUCED_DIR = project_root / "data" / "reduced"
 
 for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR, REDUCED_DIR]:
     if not path.is_dir():
-        raise ValueError(f"directory not found: f{path}")
+        raise ValueError(f"directory not found: {path}")
 
 
 @dataclass
@@ -76,55 +80,6 @@ class TechnologyRepository:
 multi = TechnologyRepository("multi")
 cite = TechnologyRepository("cite")
 
-
-def format_submission(Y_pred_raw, repo: TechnologyRepository):
-    """
-    Takes a square matrix of `gene*cell` of the kind usually output
-    from models and formats it as necessary for submission to the
-    kaggle competition
-    """
-    logger = get_run_logger()
-    logger.info("Loading indices...")
-    test_index = np.load(
-        repo.test_inputs_sparse_idxcol_path,
-        allow_pickle=True,
-    )["index"]
-    y_columns = np.load(
-        repo.train_targets_sparse_idxcol_path,
-        allow_pickle=True,
-    )["columns"]
-
-    # Maps from row number to cell_id
-    cell_dict = dict((k, i) for i, k in enumerate(test_index))
-    assert len(cell_dict) == len(test_index)
-    gene_dict = dict((k, i) for i, k in enumerate(y_columns))
-    assert len(gene_dict) == len(y_columns)
-
-    assert len(y_columns) == Y_pred_raw.shape[1]
-    assert len(test_index) == Y_pred_raw.shape[0]
-    logger.info("Loading evaluation ids...")
-    eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
-
-    # Create two arrays of indices, so that for every row in long `eval_ids`
-    # list we have the coordinates of the corresponding value in the
-    # model's rectangular output matrix.
-    eval_ids_cell_num = eval_ids.cell_id.apply(lambda x: cell_dict.get(x, -1))
-    eval_ids_gene_num = eval_ids.gene_id.apply(lambda x: gene_dict.get(x, -1))
-    # Eval_id rows that have both and "x" and "y" index are valid
-    # TODO: should check that nothing has just one (x or y) index
-    valid_multi_rows = (eval_ids_gene_num != -1) & (eval_ids_cell_num != -1)
-    # create empty submission series
-    submission = pd.Series(
-        name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
-    )
-    logger.info("Final step: fill empty submission df...")
-    # Neat numpy trick to make a 1d array from 2d based on two arrays:
-    # one of "x" coordinates and one of "y" coordinates of the 2d array.
-    submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
-        eval_ids_cell_num[valid_multi_rows].to_numpy(),  # type: ignore
-        eval_ids_gene_num[valid_multi_rows].to_numpy(),  # type: ignore
-    ]
-    return submission
 
 
 def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -235,16 +190,19 @@ def load_test_inputs(*, technology: TechnologyRepository, **kwargs):
 def load_all_data(
     technology: TechnologyRepository,
     max_rows_train: int,
-    submit_to_kaggle: bool,
+    full_submission: bool,
     sparse: bool,
 ):
     train_inputs = load_test_inputs.submit(
         technology=technology, max_rows_train=max_rows_train, sparse=sparse
     )
+    # Targets need to be in dense format for sklearn training :-(
     targets_train = load_train_targets.submit(
         technology=technology, max_rows_train=max_rows_train
     )
-    if submit_to_kaggle:
+    # If submitting to kaggle need to load full test_inputs to generate
+    # a complete and valid submission
+    if full_submission:
         test_inputs = load_test_inputs.submit(technology=technology, sparse=sparse)
     else:
         test_inputs = load_test_inputs.submit(
@@ -253,7 +211,7 @@ def load_all_data(
     return Datasets(train_inputs, targets_train, test_inputs)
 
 
-@task()
+@task
 def truncated_pca(
     dataset, n_components, return_model: bool = False
 ) -> Tuple[np.ndarray, Optional[TruncatedSVD]]:
@@ -318,6 +276,7 @@ def fit_and_score_pca_targets(
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
     Y = pca_test_targets @ pca_model_targets.components_
     score = correlation_score(Y, Y_hat)
+    mlflow.log_metric("Score", score)
     logger.info(f"Score: {score}")
     return Score(score=score)
 
@@ -353,3 +312,92 @@ def k_fold_validation(
         logger.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
+
+def format_submission(Y_pred_raw, technology: TechnologyRepository):
+    """
+    Takes a square matrix of `gene*cell` of the kind usually output
+    from models and formats it as necessary for submission to the
+    kaggle competition
+    """
+    logger = get_run_logger()
+    logger.info("Loading indices...")
+    test_index = np.load(
+        technology.test_inputs_sparse_idxcol_path,
+        allow_pickle=True,
+    )["index"]
+    y_columns = np.load(
+        technology.train_targets_sparse_idxcol_path,
+        allow_pickle=True,
+    )["columns"]
+
+    # Maps from row number to cell_id
+    cell_dict = dict((k, i) for i, k in enumerate(test_index))
+    assert len(cell_dict) == len(test_index)
+    gene_dict = dict((k, i) for i, k in enumerate(y_columns))
+    assert len(gene_dict) == len(y_columns)
+
+    assert len(y_columns) == Y_pred_raw.shape[1]
+    assert len(test_index) == Y_pred_raw.shape[0]
+    logger.info("Loading evaluation ids...")
+    eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
+
+    # Create two arrays of indices, so that for every row in long `eval_ids`
+    # list we have the coordinates of the corresponding value in the
+    # model's rectangular output matrix.
+    eval_ids_cell_num = eval_ids.cell_id.apply(lambda x: cell_dict.get(x, -1))
+    eval_ids_gene_num = eval_ids.gene_id.apply(lambda x: gene_dict.get(x, -1))
+    # Eval_id rows that have both and "x" and "y" index are valid
+    # TODO: should check that nothing has just one (x or y) index
+    valid_multi_rows = (eval_ids_gene_num != -1) & (eval_ids_cell_num != -1)
+    # create empty submission series
+    submission = pd.Series(
+        name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
+    )
+    logger.info("Final step: fill empty submission df...")
+    # Neat numpy trick to make a 1d array from 2d based on two arrays:
+    # one of "x" coordinates and one of "y" coordinates of the 2d array.
+    submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
+        eval_ids_cell_num[valid_multi_rows].to_numpy(),  # type: ignore
+        eval_ids_gene_num[valid_multi_rows].to_numpy(),  # type: ignore
+    ]
+    return submission
+
+
+@task()
+def merge_submission(
+    this_technology_predictions,
+    other_technology_predictions_filename: Optional[str], 
+    ):
+        """
+        merge predictions for a technology that are currently in memory with
+        other technology predictions on disk to make a full submission for both
+        modalities
+        """
+        # Format this experiment for submission
+        if other_technology_predictions_filename:
+            # TODO: need to read from prefect files
+            # Load other submission which includes predictions for alternate tech
+            OTHER_SUBMISSION_PATH = OUTPUT_DIR / f"{other_technology_predictions_filename}.csv"
+            other_submission = pd.read_csv(OTHER_SUBMISSION_PATH, index_col=0)
+            # drop multi-index to align with other submission
+            reindexed_submission_this = pd.DataFrame(this_technology_predictions.result().reset_index(drop=True)) # type: ignore
+            # Merge with separate predictions for other technology
+            merged = reindexed_submission_this["target"].fillna(
+                other_submission[reindexed_submission_this["target"].isna()]["target"]
+            )
+            # put into dataframe with proper column names
+            formatted_submission = pd.DataFrame(merged, columns=["target"])
+            formatted_submission.index.name = "row_id"
+            test_valid_submission(formatted_submission)
+        return this_technology_predictions.result().fillna(0) # type: ignore
+
+@task
+# Should use MLFlow data, not prefect
+# flow_context = prefect.context.get_run_context().flow_run.dict()
+def submit_to_kaggle(merged_submission, flow_context: Dict):
+    # write full predictions to csv
+    submission_file_name = f"{str(OUTPUT_DIR)}/{flow_context['name']}.csv"
+    merged_submission.to_csv(submission_file_name)
+    os.system( 
+        f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{str(flow_context)}"'
+    )

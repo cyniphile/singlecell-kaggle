@@ -1,8 +1,89 @@
+# 10/24
+
+Still trying to figure out what do about pipelining. It's brought some nice benefits, such as how it stores metadata and puts it all in a nice web ui. But it's also caused performance issues which I can't afford. I'm also afraid it's become more of a distraction than an aid (though I can chalk of some of the dev time to amortizable learning and setup, it's getting to be too much). 
+
+Today I'm gonna do a blitz to try out dagster. If I have any problems, depending on how things go I'll either just go back to where I am now (using prefect) and manually implement some things, or continue with dagster and manually implement some things. 
+
+
+# 10/22-10/23
+
+Did some more research into alternative tools. Airflow just seems like a bad idea, as people complain it's not that great locally, and looking at the docs, it doesn't seem very incrementalist. People had complained that Dagster was higher cognitive overhead than prefect, but I took a look at the docs and they actually made a lot of sense. The tool also seems easy to adopt incrementally. Most importantly it SEEMS to support caching of `jobs` (their version of prefect's `flow`). However, it's listed as an "experimental" feature. 
+
+Also, thinking about the `day` features, and how to best use them. Need to research ordinal features.
+
+# 10/21
+
+Refactoring workflow dag to cache more efficiently and merge and submit models more cleanly. Only problem is I'm running into some weird hanging behavior on the submission formatting that I've not had before. Gonna try uninstalling modin, and prefect-dask to ensure none of that bs is somehow getting in the way. This step used to take like 5min at most.
+
+I also deleted some `del` statements (thinking maybe the gc wasn't doing it's job) gonna test if that was the problem. Python was using ~17g of memory before, now...same. I take it back gc...ur good.
+
+Maybe it's because I put this function inside a prefect `task`? I took it out of the `task` wrapper and things went a lot faster. Maybe it's trying to cache or serialization too much?  This makes me worried about using prefect tasks. What is the true cost of wrapping a function in `task`?? Does this mean setting up lots of tasks and flows will be detrimental whenever you're on a single machine? Seems like it!
+
+Also caching is not working the way I expect (same params run twice will use cached data if available). But this is not happening. After a long investigation, it's turns out you can only cache tasks, but not flow. WTF!! This makes no sense. My question of "[how to cache flows](https://github.com/PrefectHQ/prefect/issues/7288)" turned into a feature request. Easy caching or memoization was basically the main reason I turned to 3rd party workflow tools in the first place!
+
+Side note: prefect seems not great at knowing when a flow/task has finished. Lots of tasks considered "running"
+
+
+
+# 10/20
+
+Ok bucko (jordan peterson voice), getting a bit sloppy on goals and follow through here. Today, hard deadline, get all experiment tracking set up, and do one experiment. MLFlow turned out to be quite easy to setup and nice to use. 
+
+Some mlflow issues to fix:
+```
+2022/10/20 12:17:25 WARNING mlflow.sklearn: Training metrics will not be recorded because training labels were not specified. To automatically record training metrics, provide training labels as inputs to the model training function.
+2022/10/20 12:17:25 WARNING mlflow.sklearn: Failed to infer model signature: the trained model does not specify a `predict` function, which is required in order to infer the signature
+2022/10/20 12:17:25 WARNING mlflow.sklearn: Model was missing function: predict. Not logging python_function flavor!
+```
+
+The bigger issue was trying to use dask with prefect. Led to big slowdowns on the larger data. First, got the following warning:
+```
+/Users/luke/projects/singlecell-kaggle/.venv/lib/python3.10/site-packages/distributed/worker.py:2823: UserWarning: Large object of size 89.76 MiB detected in task graph:
+  {'task': <prefect.tasks.Task object at 0x1333e28f0 ... ENABLED=True))}
+Consider scattering large objects ahead of time
+with client.scatter to reduce scheduler burden and
+keep data on workers
+
+    future = client.submit(func, big_data)    # bad
+
+    big_future = client.scatter(big_data)     # good
+    future = client.submit(func, big_future)  # good
+  warnings.warn(
+```
+
+Also getting this random error sometimes:
+```
+2022/10/20 14:26:13 WARNING mlflow.sklearn.utils: RegressorMixin.score failed. The 'training_score' metric will not be recorded. Scoring error: shapes (666,666) and (667,4) not aligned: 666 (dim 1) != 667 (dim 0)
+```
+Seem to happen when I use the `run` command in vscode:
+
+```
+ source /Users/luke/projects/singlecell-kaggle/.venv/bin/activate
+ /Users/luke/projects/singlecell-kaggle/.venv/bin/python /Users/luke/projects/singlecell-kaggle/code/rbf_pca_normed_input_output.py
+```
+
+...but not when I run the same script using `test.sh`. 
+
+This only happens when is use the `DaskTaskRunner`. It also seems to have wildly unpredictable compute times. 
+
+Given the problems I've been seeing with dask, gonna dump it for now and try `modin`. Modin seems immature. Lots of odd assertion and other errors littering logs even on successful runs. Also did not speed up things for my workflow (maybe not enough data manipulation yet?)
+![The slow numbers for each `max_rows_train` are all modin](2022-10-20-19-00-00.png)
+
+
+-----
+
+Meanwhile, mlflow throws an error:
+```
+INVALID_PARAMETER_VALUE: Model registry functionality is unavailable; got unsupported URI './mlruns' for model registry data storage. Supported URI schemes are: ['postgresql', 'mysql', 'sqlite', 'mssql']. See https://www.mlflow.org/docs/latest/tracking.html#storage for how to run an MLflow server against one of the supported backend storage locations.
+```
+Turns out this only is relevant if you're using it to serve models (I'm not).
+
+
 # 10/19
 
 Spent morning working on movie stuff and meeting with a friend. Now finishing up working out the kinks with making prefect work with dask. There is some async error going on. Goal for today to get experiment tracking with MLFlow and some automatic hyper-param optimization for smaller data. 
  
-Ran into some weird bugs with the python debugger using jupyter notebooks with the `DaskTaskRunner`. Switching to a scripts as notebooks are proving too unwieldy in this more mature phase. Then stayed up late into the researching experiment trackers as I'm getting cold feet on mlflow a bit. That said, it seems like the top choice, maybe other than WandB. ClearML also seems interesting. I'm going probably a bit to far into tool optimization, but hopefully I can not worry about tools for an ml project for a long time.
+Ran into some weird bugs with the python debugger using jupyter notebooks with the `DaskTaskRunner`. Switching to a scripts as notebooks are proving too unwieldy in this more mature phase. Then stayed up late into the researching experiment trackers as I'm getting cold feet on mlflow a bit. That said, it seems like the top choice, maybe other than WandB. ClearML also seems interesting. I'm going probably a bit too far into tool optimization, but hopefully I can not worry about tools for an ml project for a long time.
 
 # 10/18
 
