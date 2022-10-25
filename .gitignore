@@ -4,3 +4,4 @@ data/*
 code/tmp/*
 dask-worker-space
 mlruns
+code/playground.ipynb

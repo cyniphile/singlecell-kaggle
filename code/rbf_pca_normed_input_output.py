@@ -12,7 +12,6 @@ from utils import (
 import numpy as np
 from prefect import flow, get_run_logger
 from prefect.filesystems import LocalFileSystem
-from prefect.tasks import task_input_hash
 import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
@@ -93,5 +92,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--full_submission", action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
-    full_submission = args.full_submission
-    submission = last_year_rbf_flow(full_submission=full_submission)
+    # Should be a 1:1 mapping of args to function params
+    args_dict = vars(args)
+    if args.full_submission:
+        print("calculating full submission")
+        utils.run_or_get_cache_csv(last_year_rbf_flow, args_dict)
+    else:
+        # run with default test params
+        last_year_rbf_flow()

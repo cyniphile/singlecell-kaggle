@@ -1,13 +1,17 @@
 from typing import Dict, List, Tuple
+
+import dataclasses, json
+import hashlib
+import inspect
+import json
 import os
 import pathlib
 import typing
 import mlflow  # type: ignore
 
-from datetime import timedelta
-from prefect.tasks import task_input_hash
 import numpy as np
 import scipy as sp  # type: ignore
+
 # import modin.pandas as pd
 import pandas as pd
 from dataclasses import dataclass
@@ -36,15 +40,12 @@ DATA_DIR = project_root / "data" / "original"
 
 # Sparse data dir.
 SPARSE_DATA_DIR = project_root / "data" / "sparse"
-    
+
 # Predictions Output data dir.
 OUTPUT_DIR = project_root / "data" / "submissions"
 
-# Predictions Output data dir.
-REDUCED_DIR = project_root / "data" / "reduced"
 
-
-for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR, REDUCED_DIR]:
+for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
     if not path.is_dir():
         raise ValueError(f"directory not found: {path}")
 
@@ -79,7 +80,6 @@ class TechnologyRepository:
 
 multi = TechnologyRepository("multi")
 cite = TechnologyRepository("cite")
-
 
 
 def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -144,7 +144,8 @@ class Datasets:
     test_inputs: typing.Any
 
 
-# Prefect functions
+# Prefect pipeline functions
+
 
 def load_data(
     *,
@@ -237,10 +238,8 @@ def pca_inputs(
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
     reduced_values, pca_model = truncated_pca.submit(
-        inputs, 
-        n_components, 
-        return_model
-    ).result() 
+        inputs, n_components, return_model
+    ).result()
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
@@ -248,12 +247,8 @@ def pca_inputs(
     # Last len(input_test) rows are input_test
     pca_test_inputs = reduced_values[train_inputs.shape[0] :]  # type: ignore
     assert (
-        pca_train_inputs.shape[0]
-        + pca_test_inputs.shape[0]
-    # Black doing weird formatting here
-    # fmt: off
-    ) == reduced_values.shape[0]  # type: ignore
-    # fmt: on
+        pca_train_inputs.shape[0] + pca_test_inputs.shape[0]
+    ) == reduced_values.shape[0]
     return pca_train_inputs, pca_test_inputs, pca_model  # type: ignore
 
 
@@ -313,6 +308,7 @@ def k_fold_validation(
         scores.append(score)
     return scores
 
+
 def format_submission(Y_pred_raw, technology: TechnologyRepository):
     """
     Takes a square matrix of `gene*cell` of the kind usually output
@@ -366,30 +362,33 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
 @task()
 def merge_submission(
     this_technology_predictions,
-    other_technology_predictions_filename: Optional[str], 
-    ):
-        """
-        merge predictions for a technology that are currently in memory with
-        other technology predictions on disk to make a full submission for both
-        modalities
-        """
-        # Format this experiment for submission
-        if other_technology_predictions_filename:
-            # TODO: need to read from prefect files
-            # Load other submission which includes predictions for alternate tech
-            OTHER_SUBMISSION_PATH = OUTPUT_DIR / f"{other_technology_predictions_filename}.csv"
-            other_submission = pd.read_csv(OTHER_SUBMISSION_PATH, index_col=0)
-            # drop multi-index to align with other submission
-            reindexed_submission_this = pd.DataFrame(this_technology_predictions.result().reset_index(drop=True)) # type: ignore
-            # Merge with separate predictions for other technology
-            merged = reindexed_submission_this["target"].fillna(
-                other_submission[reindexed_submission_this["target"].isna()]["target"]
-            )
-            # put into dataframe with proper column names
-            formatted_submission = pd.DataFrame(merged, columns=["target"])
-            formatted_submission.index.name = "row_id"
-            test_valid_submission(formatted_submission)
-        return this_technology_predictions.result().fillna(0) # type: ignore
+    other_technology_predictions_filename: Optional[str],
+):
+    """
+    merge predictions for a technology that are currently in memory with
+    other technology predictions on disk to make a full submission for both
+    modalities
+    """
+    # Format this experiment for submission
+    if other_technology_predictions_filename:
+        # TODO: need to read from prefect files
+        # Load other submission which includes predictions for alternate tech
+        OTHER_SUBMISSION_PATH = (
+            OUTPUT_DIR / f"{other_technology_predictions_filename}.csv"
+        )
+        other_submission = pd.read_csv(OTHER_SUBMISSION_PATH, index_col=0)
+        # drop multi-index to align with other submission
+        reindexed_submission_this = pd.DataFrame(this_technology_predictions.result().reset_index(drop=True))  # type: ignore
+        # Merge with separate predictions for other technology
+        merged = reindexed_submission_this["target"].fillna(
+            other_submission[reindexed_submission_this["target"].isna()]["target"]
+        )
+        # put into dataframe with proper column names
+        formatted_submission = pd.DataFrame(merged, columns=["target"])
+        formatted_submission.index.name = "row_id"
+        test_valid_submission(formatted_submission)
+    return this_technology_predictions.result().fillna(0)  # type: ignore
+
 
 @task
 # Should use MLFlow data, not prefect
@@ -398,6 +397,41 @@ def submit_to_kaggle(merged_submission, flow_context: Dict):
     # write full predictions to csv
     submission_file_name = f"{str(OUTPUT_DIR)}/{flow_context['name']}.csv"
     merged_submission.to_csv(submission_file_name)
-    os.system( 
+    os.system(
         f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{str(flow_context)}"'
     )
+
+
+class EnhancedJSONEncoder(json.JSONEncoder):
+    """
+    taken from https://stackoverflow.com/questions/51286748/make-the-python-json-encoder-support-pythons-new-dataclasses
+    used to encode dataclasses into json
+    """
+
+    def default(self, o):
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        return super().default(o)
+
+
+@flow
+def run_or_get_cache_csv(flow, args_dict, force_run: bool = False):
+    """
+    given a flow and its args, determine if it has been run before. If not
+    run; if so return saved csv
+    """
+    logger = get_run_logger()
+    default_args_str = str(inspect.signature(flow).parameters)
+    overridden_args_str = json.dumps(args_dict, sort_keys=True, cls=EnhancedJSONEncoder)
+    hash_base = (default_args_str + overridden_args_str).encode("utf-8")
+    args_hash = str(int(hashlib.md5(hash_base).hexdigest(), 16))
+    filename = "-".join([flow.__name__, args_hash]) + ".csv"
+    file_path = f"{OUTPUT_DIR}/{filename}"
+    if os.path.exists(file_path) and not force_run:
+        logger.info("found cache, skipping recalculation...")
+        submission = pd.read_csv(file_path)
+    else:
+        logger.info("found cache, skipping recalculation...")
+        submission = flow(**args_dict)
+        submission.to_csv(file_path)
+    return submission
