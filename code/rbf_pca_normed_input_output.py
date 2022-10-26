@@ -16,6 +16,9 @@ import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
 
+# import logging
+
+# logging.getLogger().setLevel(logging.INFO)
 # from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
 
 # By default, Prefect makes a best effort to compute a
@@ -24,8 +27,8 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 @flow(
     name="RBF with Input and Target PCA",
     description="Based on last year's winner of RNA->Prot",
-    persist_result=True,
-    result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
+    # persist_result=True,
+    # result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
     # task_runner=DaskTaskRunner(),
 )
 def last_year_rbf_flow(
@@ -39,52 +42,55 @@ def last_year_rbf_flow(
     scale=10,  # RBF scale param. Higher means more model complexity
     alpha=0.2,  # Regularization param. More is more regularization.
 ):
-    # log all inputs into mlflow
-    # TODO: not logging k-folds correctly
-    mlflow.log_params(locals())
-    mlflow.sklearn.autolog()
-    logger = get_run_logger()
-    data: Datasets = load_all_data(
-        technology=technology,
-        max_rows_train=max_rows_train,
-        full_submission=full_submission,
-        sparse=True,
-    )
-    train_inputs, train_targets, test_inputs = (
-        data.train_inputs,
-        data.train_targets,
-        data.test_inputs,
-    )
-    pca_train_inputs, pca_test_inputs, _ = pca_inputs(
-        train_inputs, test_inputs, inputs_pca_dims
-    )
-    pca_train_targets, pca_model_targets = truncated_pca.submit(
-        train_targets, targets_pca_dims, return_model=True
-    ).result()
-    # TODO: ensure float32 is best
-    train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)
-    kernel = RBF(length_scale=scale)
-    krr = KernelRidge(alpha=alpha, kernel=kernel)  # type: ignore
-    if full_submission:
-        test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)
-        logger.info("Fit full model on all training data")
-        krr.fit(train_norm, pca_train_targets)
-        logger.info("Predict on full submission inputs")
-        Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
-        formatted_submission = utils.format_submission(Y_hat, technology)
-        return formatted_submission
-    else:
-        # TODO: not sure why this is slow for multi
-        scores = k_fold_validation(
-            model=krr,
-            train_inputs=train_norm,
-            train_targets=pca_train_targets,
-            fit_and_score_func=fit_and_score_pca_targets,
-            k=k_folds,
-            pca_model_targets=pca_model_targets,
+    with mlflow.start_run() as ml_run:
+        # log all inputs into mlflow
+        # TODO: not logging k-folds correctly
+        mlflow.log_params(locals())
+        logging = get_run_logger()
+        data: Datasets = load_all_data(
+            technology=technology,
+            max_rows_train=max_rows_train,
+            full_submission=full_submission,
+            sparse=True,
         )
-        score_summary = ScoreSummary(scores)
-        logger.info(f"K-Fold complete. Scores: {score_summary}")
+        train_inputs, train_targets, test_inputs = (
+            data.train_inputs,
+            data.train_targets,
+            data.test_inputs,
+        )
+        pca_train_inputs, pca_test_inputs, _ = pca_inputs(
+            train_inputs, test_inputs, inputs_pca_dims
+        )
+        pca_train_targets, pca_model_targets = truncated_pca.submit(
+            train_targets,
+            targets_pca_dims,
+            return_model=True,
+        ).result()
+        # TODO: ensure float32 is best
+        train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)
+        kernel = RBF(length_scale=scale)
+        krr = KernelRidge(alpha=alpha, kernel=kernel)  # type: ignore
+        if full_submission:
+            mlflow.sklearn.autolog()
+            test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)
+            logging.info("Fit full model on all training data")
+            krr.fit(train_norm, pca_train_targets)
+            logging.info("Predict on full submission inputs")
+            Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
+            formatted_submission = utils.format_submission(Y_hat, technology)
+            return formatted_submission
+        else:
+            # TODO: not sure why this is slow for multi
+            scores = k_fold_validation(
+                model=krr,
+                train_inputs=train_norm,
+                train_targets=pca_train_targets,
+                fit_and_score_func=fit_and_score_pca_targets,
+                k=k_folds,
+                pca_model_targets=pca_model_targets,
+            )
+            score_summary = ScoreSummary(scores)
+            # logger.info(f"K-Fold complete. Scores: {score_summary}")
 
 
 if __name__ == "__main__":
@@ -94,9 +100,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # Should be a 1:1 mapping of args to function params
     args_dict = vars(args)
+    args.full_submission = True
     if args.full_submission:
-        print("calculating full submission")
-        utils.run_or_get_cache_csv(last_year_rbf_flow, args_dict)
+        utils.run_or_get_cache(last_year_rbf_flow, args_dict)
     else:
         # run with default test params
         last_year_rbf_flow()

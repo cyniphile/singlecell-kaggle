@@ -1,8 +1,18 @@
+# 10/26
+
+Iteration is slow testing these larger jobs. I think in general I need to spend more time setting up test cases that don't take too long to run. If an iteration is a minute or five, that not only slows development a lot but also causes focus-loss because you have to either wait or context switch during the training. Hard to overcome the overhead of and complexity of writing a "small" test case when you aren't yet sure if it will pay off, but I think prob need to make a rule for myself: if a test takes > 30s to run, rewrite.
+
+Decided to dig deeper into why wrapping a certain function in `@task` was causing a huge performance regression. I probably wouldn't do this if I was at a real job, but maybe I would. It's important to have some intuition for why things break. Then again, it's been too long since I actually iterated on real predictions. Filed a bug report, and also discovered a solution to some of these issues: tasks and flows should not return numpy objects. Making a task return a dataframe instead of a numpy object eliminated performance issues cause by wrapping in `@task`
+
 # 10/25
 
 Ok goal is to as quickly as possible (as possible) set up a simple caching function for flow outputs. Basically hyperparams, data, model. I think the biggest weak spot here is the "data". Need to rework slightly as an input..probably just function `__name__`.
 
 Got a solution working, though it took a lot longer than I hoped because apparently `hash` is not consistent across python runs. 
+
+Was also running into some serious slowness with writing output to csv, so switched to arrow/feather which is supposed to be faster for I/O.
+
+I also did more experiments with de-activating or removing all Prefect functionality to see if it was causing slowdowns. With prefect completely remove runtime was about the same as with it. The only exception, which I've confirmed again, is the `format_submission` task.
 
 # 10/24
 

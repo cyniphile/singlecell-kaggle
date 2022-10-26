@@ -1,6 +1,8 @@
 from typing import Dict, List, Tuple
 
 import dataclasses, json
+
+# import logging
 import hashlib
 import inspect
 import json
@@ -20,6 +22,8 @@ from typing import Optional
 
 from sklearn.model_selection import KFold  # type: ignore
 from sklearn.decomposition import TruncatedSVD  # type: ignore
+
+# logging.getLogger().setLevel(logging.INFO)
 
 
 def get_git_root():
@@ -195,19 +199,28 @@ def load_all_data(
     sparse: bool,
 ):
     train_inputs = load_test_inputs.submit(
-        technology=technology, max_rows_train=max_rows_train, sparse=sparse
+        # train_inputs = load_test_inputs(
+        technology=technology,
+        max_rows_train=max_rows_train,
+        sparse=sparse,
     )
     # Targets need to be in dense format for sklearn training :-(
     targets_train = load_train_targets.submit(
-        technology=technology, max_rows_train=max_rows_train
+        # targets_train = load_train_targets(
+        technology=technology,
+        max_rows_train=max_rows_train,
     )
     # If submitting to kaggle need to load full test_inputs to generate
     # a complete and valid submission
     if full_submission:
         test_inputs = load_test_inputs.submit(technology=technology, sparse=sparse)
+        # test_inputs = load_test_inputs(technology=technology, sparse=sparse)
     else:
         test_inputs = load_test_inputs.submit(
-            technology=technology, max_rows_train=max_rows_train, sparse=sparse
+            # test_inputs = load_test_inputs(
+            technology=technology,
+            max_rows_train=max_rows_train,
+            sparse=sparse,
         )
     return Datasets(train_inputs, targets_train, test_inputs)
 
@@ -238,8 +251,12 @@ def pca_inputs(
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
     reduced_values, pca_model = truncated_pca.submit(
-        inputs, n_components, return_model
+        # reduced_values, pca_model = truncated_pca(
+        inputs,
+        n_components,
+        return_model,
     ).result()
+    # )
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
@@ -265,14 +282,14 @@ def fit_and_score_pca_targets(
     performs model fit and score where model is predicting a reduced
     pca vector that needs to be converted back to raw data space
     """
-    logger = get_run_logger()
+    logging = get_run_logger()
     model.fit(train_inputs, pca_train_targets)
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
     Y = pca_test_targets @ pca_model_targets.components_
     score = correlation_score(Y, Y_hat)
     mlflow.log_metric("Score", score)
-    logger.info(f"Score: {score}")
+    logging.info(f"Score: {score}")
     return Score(score=score)
 
 
@@ -286,7 +303,7 @@ def k_fold_validation(
     k: int,
     **model_kwargs,
 ):
-    logger = get_run_logger()
+    logging = get_run_logger()
     kf = KFold(n_splits=k)
     scores = []
     for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_inputs)):
@@ -294,8 +311,9 @@ def k_fold_validation(
         fold_train_targets = train_targets[train_indices]
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
-        logger.info(f"Fitting fold {fold_index}...")
+        logging.info(f"Fitting fold {fold_index}...")
         # Use `.submit` function to make Prefect do tasks concurrently
+        # score = fit_and_score_func(
         score = fit_and_score_func.submit(
             fold_train_inputs,
             fold_train_targets,
@@ -304,19 +322,20 @@ def k_fold_validation(
             model=model,
             **model_kwargs,
         )
-        logger.info(f"Score {score} for fold {fold_index}")
+        logging.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
 
 
+@task  # greatly slows runtime if made into a task
 def format_submission(Y_pred_raw, technology: TechnologyRepository):
     """
     Takes a square matrix of `gene*cell` of the kind usually output
     from models and formats it as necessary for submission to the
     kaggle competition
     """
-    logger = get_run_logger()
-    logger.info("Loading indices...")
+    logging = get_run_logger()
+    logging.info("Loading indices...")
     test_index = np.load(
         technology.test_inputs_sparse_idxcol_path,
         allow_pickle=True,
@@ -334,7 +353,7 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
 
     assert len(y_columns) == Y_pred_raw.shape[1]
     assert len(test_index) == Y_pred_raw.shape[0]
-    logger.info("Loading evaluation ids...")
+    logging.info("Loading evaluation ids...")
     eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
 
     # Create two arrays of indices, so that for every row in long `eval_ids`
@@ -349,49 +368,44 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
     submission = pd.Series(
         name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
     )
-    logger.info("Final step: fill empty submission df...")
+    logging.info("Final step: fill empty submission df...")
     # Neat numpy trick to make a 1d array from 2d based on two arrays:
     # one of "x" coordinates and one of "y" coordinates of the 2d array.
+
     submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
         eval_ids_cell_num[valid_multi_rows].to_numpy(),  # type: ignore
         eval_ids_gene_num[valid_multi_rows].to_numpy(),  # type: ignore
     ]
-    return submission
-
-
-@task()
-def merge_submission(
-    this_technology_predictions,
-    other_technology_predictions_filename: Optional[str],
-):
-    """
-    merge predictions for a technology that are currently in memory with
-    other technology predictions on disk to make a full submission for both
-    modalities
-    """
-    # Format this experiment for submission
-    if other_technology_predictions_filename:
-        # TODO: need to read from prefect files
-        # Load other submission which includes predictions for alternate tech
-        OTHER_SUBMISSION_PATH = (
-            OUTPUT_DIR / f"{other_technology_predictions_filename}.csv"
-        )
-        other_submission = pd.read_csv(OTHER_SUBMISSION_PATH, index_col=0)
-        # drop multi-index to align with other submission
-        reindexed_submission_this = pd.DataFrame(this_technology_predictions.result().reset_index(drop=True))  # type: ignore
-        # Merge with separate predictions for other technology
-        merged = reindexed_submission_this["target"].fillna(
-            other_submission[reindexed_submission_this["target"].isna()]["target"]
-        )
-        # put into dataframe with proper column names
-        formatted_submission = pd.DataFrame(merged, columns=["target"])
-        formatted_submission.index.name = "row_id"
-        test_valid_submission(formatted_submission)
-    return this_technology_predictions.result().fillna(0)  # type: ignore
+    # Need to convert to dataframe else prefect slows things down a lot
+    # https://github.com/PrefectHQ/prefect/issues/7065#issuecomment-1292345882
+    return pd.DataFrame(submission)
 
 
 @task
-# Should use MLFlow data, not prefect
+def merge_submission(
+    this_technology_predictions,
+    other_technology_predictions,
+):
+    """
+    merge predictions for two technologies to make a full submission for both
+    """
+    # drop multi-index to align with other submission
+    reindexed_submission_this = this_technology_predictions.reset_index(drop=True)
+    # Merge with separate predictions for other technology
+    merged = reindexed_submission_this["target"].fillna(
+        other_technology_predictions[reindexed_submission_this["target"].isna()][
+            "target"
+        ]
+    )
+    # put into dataframe with proper column names
+    formatted_submission = pd.DataFrame(merged, columns=["target"])
+    formatted_submission.index.name = "row_id"
+    test_valid_submission(formatted_submission)
+    return formatted_submission
+
+
+@task
+# TODO Should use MLFlow data, not prefect
 # flow_context = prefect.context.get_run_context().flow_run.dict()
 def submit_to_kaggle(merged_submission, flow_context: Dict):
     # write full predictions to csv
@@ -414,24 +428,27 @@ class EnhancedJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-@flow
-def run_or_get_cache_csv(flow, args_dict, force_run: bool = False):
+@flow  # Seems to greatly slow down function if made a flow....
+def run_or_get_cache(flow, args_dict, force_run: bool = False):
     """
     given a flow and its args, determine if it has been run before. If not
-    run; if so return saved csv
+    run; if so return saved. Using Arrow/feather format
     """
-    logger = get_run_logger()
+    logging = get_run_logger()
     default_args_str = str(inspect.signature(flow).parameters)
     overridden_args_str = json.dumps(args_dict, sort_keys=True, cls=EnhancedJSONEncoder)
     hash_base = (default_args_str + overridden_args_str).encode("utf-8")
     args_hash = str(int(hashlib.md5(hash_base).hexdigest(), 16))
-    filename = "-".join([flow.__name__, args_hash]) + ".csv"
+    filename = "-".join([flow.__name__, args_hash]) + ".arrow"
     file_path = f"{OUTPUT_DIR}/{filename}"
     if os.path.exists(file_path) and not force_run:
-        logger.info("found cache, skipping recalculation...")
-        submission = pd.read_csv(file_path)
+        logging.info("found cache, skipping recalculation...")
+        submission = pd.read_feather(file_path)
+        return submission
     else:
-        logger.info("found cache, skipping recalculation...")
-        submission = flow(**args_dict)
-        submission.to_csv(file_path)
-    return submission
+        logging.info(f"no cache found, running flow {flow.__name__}")
+        submission = pd.DataFrame(flow(**args_dict)).reset_index()
+        logging.info(f"flow completed, writing result to {file_path}")
+        submission.to_feather(file_path)
+        logging.info("finished caching")
+        return submission
