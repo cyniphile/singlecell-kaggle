@@ -560,6 +560,20 @@ python-versions = ">=3.7"
 numpy = ">=1.14.5"
 
 [[package]]
+name = "hdf5plugin"
+version = "3.3.1"
+description = "HDF5 Plugins for Windows, MacOS, and Linux"
+category = "main"
+optional = false
+python-versions = ">=3.4"
+
+[package.dependencies]
+h5py = "*"
+
+[package.extras]
+dev = ["sphinx", "sphinx-rtd-theme"]
+
+[[package]]
 name = "hpack"
 version = "4.0.0"
 description = "Pure-Python HPACK header compression"
@@ -1866,7 +1880,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "flake8 
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10,<3.11"
-content-hash = "8e8e2952afd41638ac4ba08c96a74cc841e75d522f36138be1ac2e2c4447bb68"
+content-hash = "7e7c84d461c56f1f1326982dfb70b8a3dee39abbf67b49560a862817cf8797e5"
 
 [metadata.files]
 aiofiles = []
@@ -1935,6 +1949,7 @@ gunicorn = [
 h11 = []
 h2 = []
 h5py = []
+hdf5plugin = []
 hpack = []
 httpcore = []
 httpx = []
