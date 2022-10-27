@@ -98,9 +98,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # Should be a 1:1 mapping of args to function params
     args_dict = vars(args)
-    args.full_submission = True
     if args.full_submission:
-        last_year_rbf_flow(**args_dict)
+        last_year_rbf_flow(**args_dict)  # type: ignore
     else:
         # run with default test params, and caching disabled
         last_year_rbf_flow(ignore_cache=True, skip_caching=True)  # type: ignore

@@ -4,7 +4,7 @@ Iteration is slow testing these larger jobs. I think in general I need to spend 
 
 Decided to dig deeper into why wrapping a certain function in `@task` was causing a huge performance regression. I probably wouldn't do this if I was at a real job, but maybe I would. It's important to have some intuition for why things break. Then again, it's been too long since I actually iterated on real predictions. Filed a bug report, and also discovered a solution to some of these issues: tasks and flows should not return numpy objects. Making a task return a dataframe instead of a numpy object eliminated performance issues cause by wrapping in `@task`
 
-EOD, I think I finally have pipelines done for now. Starting research into how to use pseudotime algorithms as I think properly modeling temporal data will be the biggest advantage here. So far I've only seen people treating Day as a feature and maybe doing groupedkfold(day)
+EOD, I think I finally have pipelines done for now. Starting research into how to use pseudotime algorithms as I think properly modeling temporal data will be the biggest advantage here. So far I've only seen people treating Day as a feature and maybe doing `GroupedKFold(day)`
 
 # 10/25
 

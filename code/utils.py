@@ -248,7 +248,7 @@ def pca_inputs(
     """
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
-    reduced_values, pca_model = truncated_pca(
+    reduced_values, pca_model = truncated_pca(  # type: ignore
         inputs,
         n_components,
         return_model,
@@ -259,9 +259,11 @@ def pca_inputs(
     pca_train_inputs = reduced_values[: train_inputs.shape[0]]  # type: ignore
     # Last len(input_test) rows are input_test
     pca_test_inputs = reduced_values[train_inputs.shape[0] :]  # type: ignore
+    # fmt: off
     assert (
         pca_train_inputs.shape[0] + pca_test_inputs.shape[0]
-    ) == reduced_values.shape[0]
+    ) == reduced_values.shape[0]  # type: ignore
+    # fmt: on
     return pca_train_inputs, pca_test_inputs, pca_model  # type: ignore
 
 
