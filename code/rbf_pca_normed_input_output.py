@@ -41,9 +41,8 @@ def last_year_rbf_flow(
     scale=10,  # RBF scale param. Higher means more model complexity
     alpha=0.2,  # Regularization param. More is more regularization.
 ):
-    with mlflow.start_run() as _:
+    with mlflow.start_run():
         # log all inputs into mlflow
-        # TODO: not logging k-folds correctly
         mlflow.log_params(locals())
         logging = get_run_logger()
         data: Datasets = load_all_data(
@@ -80,6 +79,7 @@ def last_year_rbf_flow(
             return formatted_submission
         else:
             # TODO: not sure why this is slow for multi
+            mlflow.sklearn.autolog()
             scores = k_fold_validation(
                 model=krr,
                 train_inputs=train_norm,

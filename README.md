@@ -1,6 +1,5 @@
 https://www.kaggle.com/competitions/open-problems-multimodal/
 ## How To Run
- <!-- TODO: setup virtual env not using poetry -->
 1. 
 ```sh
 pyenv install 3.10.6
@@ -15,7 +14,6 @@ poetry install
 
 If poetry is giving you issues there is also a `requirements.txt` file available for standard installation of packages into a virtualenv.
 
- <!-- TODO: Instructions on where to download and extract. -->
 2. Download [the dataset](https://www.kaggle.com/competitions/open-problems-multimodal/data) and extract to `data/original`.
 3. Download [sparse dataset](https://www.kaggle.com/datasets/fabiencrom/multimodal-single-cell-as-sparse-matrix) and extract to `data/sparse`
 

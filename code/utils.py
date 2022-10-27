@@ -440,8 +440,8 @@ def merge_and_submit(df_cite, df_multi):
 @flow
 def run_or_get_cache(flow):
     """
-    TODO: use https://docs.prefect.io/concepts/states/#states to mark if read
-    decorator for flows. Determine if it has been run before. If not
+    TODO: use https://docs.prefect.io/concepts/states/#states to mark if read.
+    Decorator for flows. Determine if it has been run before. If not
     run and save results in arrow/feather file; if so return saved results.
     """
 
