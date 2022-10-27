@@ -1,8 +1,9 @@
 from typing import Dict, List, Tuple
+import functools
 
 import dataclasses, json
 
-# import logging
+import logging
 import hashlib
 import inspect
 import json
@@ -10,6 +11,7 @@ import os
 import pathlib
 import typing
 import mlflow  # type: ignore
+import prefect
 
 import numpy as np
 import scipy as sp  # type: ignore
@@ -23,7 +25,7 @@ from typing import Optional
 from sklearn.model_selection import KFold  # type: ignore
 from sklearn.decomposition import TruncatedSVD  # type: ignore
 
-# logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 
 
 def get_git_root():
@@ -198,26 +200,22 @@ def load_all_data(
     full_submission: bool,
     sparse: bool,
 ):
-    train_inputs = load_test_inputs.submit(
-        # train_inputs = load_test_inputs(
+    train_inputs = load_test_inputs(
         technology=technology,
         max_rows_train=max_rows_train,
         sparse=sparse,
     )
     # Targets need to be in dense format for sklearn training :-(
-    targets_train = load_train_targets.submit(
-        # targets_train = load_train_targets(
+    targets_train = load_train_targets(
         technology=technology,
         max_rows_train=max_rows_train,
     )
     # If submitting to kaggle need to load full test_inputs to generate
     # a complete and valid submission
     if full_submission:
-        test_inputs = load_test_inputs.submit(technology=technology, sparse=sparse)
-        # test_inputs = load_test_inputs(technology=technology, sparse=sparse)
+        test_inputs = load_test_inputs(technology=technology, sparse=sparse)
     else:
-        test_inputs = load_test_inputs.submit(
-            # test_inputs = load_test_inputs(
+        test_inputs = load_test_inputs(
             technology=technology,
             max_rows_train=max_rows_train,
             sparse=sparse,
@@ -250,13 +248,11 @@ def pca_inputs(
     """
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
-    reduced_values, pca_model = truncated_pca.submit(
-        # reduced_values, pca_model = truncated_pca(
+    reduced_values, pca_model = truncated_pca(
         inputs,
         n_components,
         return_model,
-    ).result()
-    # )
+    )
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
@@ -312,9 +308,7 @@ def k_fold_validation(
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
         logging.info(f"Fitting fold {fold_index}...")
-        # Use `.submit` function to make Prefect do tasks concurrently
-        # score = fit_and_score_func(
-        score = fit_and_score_func.submit(
+        score = fit_and_score_func(
             fold_train_inputs,
             fold_train_targets,
             fold_test_inputs,
@@ -381,7 +375,7 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
     return pd.DataFrame(submission)
 
 
-@task
+# @task # very slow as task
 def merge_submission(
     this_technology_predictions,
     other_technology_predictions,
@@ -389,6 +383,8 @@ def merge_submission(
     """
     merge predictions for two technologies to make a full submission for both
     """
+
+    # logging = get_run_logger()
     # drop multi-index to align with other submission
     reindexed_submission_this = this_technology_predictions.reset_index(drop=True)
     # Merge with separate predictions for other technology
@@ -401,16 +397,18 @@ def merge_submission(
     formatted_submission = pd.DataFrame(merged, columns=["target"])
     formatted_submission.index.name = "row_id"
     test_valid_submission(formatted_submission)
+    logging.info("finished merging")
     return formatted_submission
 
 
-@task
-# TODO Should use MLFlow data, not prefect
-# flow_context = prefect.context.get_run_context().flow_run.dict()
+# @task
 def submit_to_kaggle(merged_submission, flow_context: Dict):
+    # logging = get_run_logger()
     # write full predictions to csv
     submission_file_name = f"{str(OUTPUT_DIR)}/{flow_context['name']}.csv"
+    logging.info(f"Writing {submission_file_name} locally for submission")
     merged_submission.to_csv(submission_file_name)
+    logging.info(f"Submitting {submission_file_name} to kaggle ")
     os.system(
         f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{str(flow_context)}"'
     )
@@ -428,27 +426,54 @@ class EnhancedJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-@flow  # Seems to greatly slow down function if made a flow....
-def run_or_get_cache(flow, args_dict, force_run: bool = False):
+# @flow  # again, was slow on large inputs
+def merge_and_submit(df_cite, df_multi):
+    logging.info("starting merge")
+    # TODO Should use MLFlow data, not prefect
+    # flow_context = prefect.context.get_run_context().flow_run.dict()
+    merged = merge_submission(df_cite, df_multi)
+    submit_to_kaggle(merged, {"name": "TODO"})
+
+
+@flow
+def run_or_get_cache(flow):
     """
-    given a flow and its args, determine if it has been run before. If not
-    run; if so return saved. Using Arrow/feather format
+    TODO: use https://docs.prefect.io/concepts/states/#states to mark if read
+    decorator for flows. Determine if it has been run before. If not
+    run and save results in arrow/feather file; if so return saved results.
     """
+
     logging = get_run_logger()
-    default_args_str = str(inspect.signature(flow).parameters)
-    overridden_args_str = json.dumps(args_dict, sort_keys=True, cls=EnhancedJSONEncoder)
-    hash_base = (default_args_str + overridden_args_str).encode("utf-8")
-    args_hash = str(int(hashlib.md5(hash_base).hexdigest(), 16))
-    filename = "-".join([flow.__name__, args_hash]) + ".arrow"
-    file_path = f"{OUTPUT_DIR}/{filename}"
-    if os.path.exists(file_path) and not force_run:
-        logging.info("found cache, skipping recalculation...")
-        submission = pd.read_feather(file_path)
-        return submission
-    else:
-        logging.info(f"no cache found, running flow {flow.__name__}")
-        submission = pd.DataFrame(flow(**args_dict)).reset_index()
-        logging.info(f"flow completed, writing result to {file_path}")
-        submission.to_feather(file_path)
-        logging.info("finished caching")
-        return submission
+
+    @functools.wraps(flow)
+    def wrapper(**kwargs):
+        try:
+            ignore_cache = kwargs.pop("ignore_cache")
+        except KeyError:
+            ignore_cache = False
+        try:
+            skip_caching = kwargs.pop("skip_caching")
+        except KeyError:
+            skip_caching = False
+        default_args_str = str(inspect.signature(flow).parameters)
+        overridden_args_str = json.dumps(
+            kwargs, sort_keys=True, cls=EnhancedJSONEncoder
+        )
+        hash_base = (default_args_str + overridden_args_str).encode("utf-8")
+        args_hash = str(int(hashlib.md5(hash_base).hexdigest(), 16))
+        filename = "-".join([flow.__name__, args_hash]) + ".arrow"
+        file_path = f"{OUTPUT_DIR}/{filename}"
+        if os.path.exists(file_path) and not ignore_cache:
+            logging.info(f"found cache {file_path}, skipping recalculation...")
+            submission = pd.read_feather(file_path)
+            return submission
+        else:
+            logging.info(f"no cache found, running flow {flow.__name__}")
+            submission = pd.DataFrame(flow(**kwargs)).reset_index()
+            if not skip_caching:
+                logging.info(f"flow completed, writing result to {file_path}")
+                submission.to_feather(file_path)
+                logging.info("finished caching")
+            return submission
+
+    return wrapper

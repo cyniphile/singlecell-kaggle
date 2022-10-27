@@ -4,6 +4,7 @@ from utils import (
     fit_and_score_pca_targets,
     k_fold_validation,
     truncated_pca,
+    run_or_get_cache,
     pca_inputs,
     load_all_data,
     ScoreSummary,
@@ -16,14 +17,12 @@ import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
 
-# import logging
-
-# logging.getLogger().setLevel(logging.INFO)
 # from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
 
 # By default, Prefect makes a best effort to compute a
 # table hash of the .py file in which the flow is defined to
 # automatically detect when your code changes.
+@run_or_get_cache
 @flow(
     name="RBF with Input and Target PCA",
     description="Based on last year's winner of RNA->Prot",
@@ -42,7 +41,7 @@ def last_year_rbf_flow(
     scale=10,  # RBF scale param. Higher means more model complexity
     alpha=0.2,  # Regularization param. More is more regularization.
 ):
-    with mlflow.start_run() as ml_run:
+    with mlflow.start_run() as _:
         # log all inputs into mlflow
         # TODO: not logging k-folds correctly
         mlflow.log_params(locals())
@@ -61,11 +60,11 @@ def last_year_rbf_flow(
         pca_train_inputs, pca_test_inputs, _ = pca_inputs(
             train_inputs, test_inputs, inputs_pca_dims
         )
-        pca_train_targets, pca_model_targets = truncated_pca.submit(
+        pca_train_targets, pca_model_targets = truncated_pca(
             train_targets,
             targets_pca_dims,
             return_model=True,
-        ).result()
+        )
         # TODO: ensure float32 is best
         train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)
         kernel = RBF(length_scale=scale)
@@ -90,7 +89,6 @@ def last_year_rbf_flow(
                 pca_model_targets=pca_model_targets,
             )
             score_summary = ScoreSummary(scores)
-            # logger.info(f"K-Fold complete. Scores: {score_summary}")
 
 
 if __name__ == "__main__":
@@ -102,7 +100,7 @@ if __name__ == "__main__":
     args_dict = vars(args)
     args.full_submission = True
     if args.full_submission:
-        utils.run_or_get_cache(last_year_rbf_flow, args_dict)
+        last_year_rbf_flow(**args_dict)
     else:
-        # run with default test params
-        last_year_rbf_flow()
+        # run with default test params, and caching disabled
+        last_year_rbf_flow(ignore_cache=True, skip_caching=True)  # type: ignore
