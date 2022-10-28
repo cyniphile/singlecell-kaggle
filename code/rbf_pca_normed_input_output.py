@@ -1,6 +1,9 @@
 import utils
+from typing import List
+import inspect
 import argparse
 from utils import (
+    TechnologyRepository,
     fit_and_score_pca_targets,
     k_fold_validation,
     truncated_pca,
@@ -32,20 +35,22 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 )
 def last_year_rbf_flow(
     # default params used for testing
-    max_rows_train=1_000,
-    full_submission=False,
-    technology=utils.cite,
-    inputs_pca_dims=2,
-    targets_pca_dims=2,
-    k_folds=2,
-    scale=10,  # RBF scale param. Higher means more model complexity
-    alpha=0.2,  # Regularization param. More is more regularization.
+    max_rows_train: int = 1_000,
+    full_submission: bool = False,
+    technology: TechnologyRepository = utils.cite,
+    inputs_pca_dims: int = 2,
+    targets_pca_dims: int = 2,
+    k_folds: int = 2,
+    scale: float = 10,  # RBF scale param. Higher means more model complexity
+    alpha: float = 0.2,  # Regularization param. More is more regularization.
 ):
     with mlflow.start_run():
         # log all inputs into mlflow
         mlflow.log_params(locals())
+        # log name of function so it can be called later
+        mlflow.log_param("flow_function", inspect.currentframe().f_code.co_name)  # type: ignore
         logging = get_run_logger()
-        data: Datasets = load_all_data(
+        data: Datasets = load_all_data(  # type: ignore
             technology=technology,
             max_rows_train=max_rows_train,
             full_submission=full_submission,
@@ -56,37 +61,36 @@ def last_year_rbf_flow(
             data.train_targets,
             data.test_inputs,
         )
-        pca_train_inputs, pca_test_inputs, _ = pca_inputs(
+        pca_train_inputs, pca_test_inputs, _ = pca_inputs(  # type: ignore
             train_inputs, test_inputs, inputs_pca_dims
         )
-        pca_train_targets, pca_model_targets = truncated_pca(
+        pca_train_targets, pca_model_targets = truncated_pca(  # type: ignore
             train_targets,
             targets_pca_dims,
             return_model=True,
         )
         # TODO: ensure float32 is best
-        train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)
+        train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)  # type: ignore
         kernel = RBF(length_scale=scale)
         krr = KernelRidge(alpha=alpha, kernel=kernel)  # type: ignore
         if full_submission:
             mlflow.sklearn.autolog()
-            test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)
+            test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)  # type: ignore
             logging.info("Fit full model on all training data")
-            krr.fit(train_norm, pca_train_targets)
+            krr.fit(train_norm, pca_train_targets)  # type: ignore
             logging.info("Predict on full submission inputs")
             Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
             formatted_submission = utils.format_submission(Y_hat, technology)
             return formatted_submission
         else:
-            # TODO: not sure why this is slow for multi
             mlflow.sklearn.autolog()
-            scores = k_fold_validation(
+            scores: List[utils.Score] = k_fold_validation(
                 model=krr,
                 train_inputs=train_norm,
-                train_targets=pca_train_targets,
+                train_targets=pca_train_targets,  # type: ignore
                 fit_and_score_func=fit_and_score_pca_targets,
                 k=k_folds,
-                pca_model_targets=pca_model_targets,
+                pca_model_targets=pca_model_targets,  # type: ignore
             )
             score_summary = ScoreSummary(scores)
 
@@ -102,4 +106,5 @@ if __name__ == "__main__":
         last_year_rbf_flow(**args_dict)  # type: ignore
     else:
         # run with default test params, and caching disabled
+        last_year_rbf_flow(ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
         last_year_rbf_flow(ignore_cache=True, skip_caching=True)  # type: ignore

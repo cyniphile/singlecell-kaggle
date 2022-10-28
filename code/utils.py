@@ -1,8 +1,8 @@
 from typing import Dict, List, Tuple
 import functools
-
+import sys
 import dataclasses, json
-
+import importlib.util
 import logging
 import hashlib
 import inspect
@@ -11,12 +11,10 @@ import os
 import pathlib
 import typing
 import mlflow  # type: ignore
-import prefect
 
 import numpy as np
 import scipy as sp  # type: ignore
 
-# import modin.pandas as pd
 import pandas as pd
 from dataclasses import dataclass
 from prefect import flow, task, get_run_logger
@@ -323,7 +321,7 @@ def k_fold_validation(
     return scores
 
 
-@task  # greatly slows runtime if made into a task
+@task
 def format_submission(Y_pred_raw, technology: TechnologyRepository):
     """
     Takes a square matrix of `gene*cell` of the kind usually output
@@ -365,9 +363,9 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
         name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
     )
     logging.info("Final step: fill empty submission df...")
+
     # Neat numpy trick to make a 1d array from 2d based on two arrays:
     # one of "x" coordinates and one of "y" coordinates of the 2d array.
-
     submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
         eval_ids_cell_num[valid_multi_rows].to_numpy(),  # type: ignore
         eval_ids_gene_num[valid_multi_rows].to_numpy(),  # type: ignore
@@ -378,7 +376,7 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
 
 
 # @task # very slow as task
-def merge_submission(
+def _merge_submission(
     this_technology_predictions,
     other_technology_predictions,
 ):
@@ -404,7 +402,7 @@ def merge_submission(
 
 
 # @task
-def submit_to_kaggle(merged_submission, flow_context: Dict):
+def _submit_to_kaggle(merged_submission, flow_context: Dict):
     # logging = get_run_logger()
     # write full predictions to csv
     submission_file_name = f"{str(OUTPUT_DIR)}/{flow_context['name']}.csv"
@@ -429,12 +427,12 @@ class EnhancedJSONEncoder(json.JSONEncoder):
 
 
 # @flow  # again, was slow on large inputs
-def merge_and_submit(df_cite, df_multi):
+def _merge_and_submit(df_cite, df_multi):
     logging.info("starting merge")
     # TODO Should use MLFlow data, not prefect
     # flow_context = prefect.context.get_run_context().flow_run.dict()
-    merged = merge_submission(df_cite, df_multi)
-    submit_to_kaggle(merged, {"name": "TODO"})
+    merged = _merge_submission(df_cite, df_multi)
+    _submit_to_kaggle(merged, {"name": "TODO"})
 
 
 @flow
@@ -479,3 +477,50 @@ def run_or_get_cache(flow):
             return submission
 
     return wrapper
+
+
+def _create_submission_based_on_experiment(
+    mlflow_run_id, technology: TechnologyRepository
+):
+    """
+    given an mlflow experiment, run the same experiment but trained on full
+    data with no cv holdout, and predict on full test input
+    assumes flow has: 1) annotated kwargs 2) a `full_submission` kwarg 3) a `technology` kwarg
+    TODO: should enforce this through an interface
+    https://stackoverflow.com/questions/2124190/how-do-i-implement-interfaces-in-python
+    """
+    run = mlflow.get_run(mlflow_run_id)
+    params = run.data.params
+    assert params["technology"] == str(technology)
+    flow_filepath = run.data.tags["mlflow.source.name"]
+    flow_function_name = params["flow_function"]
+    # import module and flow function of flow that created the model
+    spec = importlib.util.spec_from_file_location(flow_function_name, flow_filepath)
+    flow_module = importlib.util.module_from_spec(spec)  # type: ignore
+    sys.modules[flow_function_name] = flow_module
+    spec.loader.exec_module(flow_module)  # type: ignore
+    flow_function = getattr(flow_module, flow_function_name)
+    # set flow to have arguments of run
+    # overriding "full_submission" to be true
+    kwargs = {}
+    flow_kwargs = inspect.signature(flow_function).parameters
+    for key in flow_kwargs.keys():
+        # convert strings to necessary types
+        # requires that flow has type-annotated kwargs
+        kwargs[key] = flow_kwargs[key].annotation(params[key])
+    kwargs["full_submission"] = True
+    kwargs["technology"] = technology
+    return flow_function(**kwargs)
+
+
+def create_submission_from_mlflow_experiments(cite_mlflow_run_id, multi_mlflow_run_id):
+    """
+    public function to create a full kaggle submission based on previously run
+    experiments logged into mlflow. Pattern is to 1) do experiments 2) find
+    the best results in mlflow 3) take those experiment ids and input them
+    into this function which will re-train the experiments will full data,
+    create predictions for full test set, and submit to kaggle for scoring
+    """
+    c = _create_submission_based_on_experiment(cite_mlflow_run_id, cite)
+    m = _create_submission_based_on_experiment(multi_mlflow_run_id, multi)
+    return _merge_and_submit(c, m)
