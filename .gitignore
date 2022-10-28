@@ -3,3 +3,5 @@ data/*
 # papermill output notebooks
 code/tmp/*
 dask-worker-space
+mlruns
+code/playground.ipynb

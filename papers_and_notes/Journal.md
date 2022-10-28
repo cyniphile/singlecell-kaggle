@@ -1,8 +1,118 @@
+# 10/28
+
+Spent the morning implementing a function that, given mlflow experiments, will retrain, predict, and submit. This really show the power of mlflow, in that I can screw around with experiments, go back and find which ones did the best, and just paste those IDs into this function to submit. Seems soo easy and fault tolerant. I'm reflecting on how much time I've spent on pipelines and infra. Was it worth it? I spent two weeks researching, testing, and getting a truly production-ready pipeline setup. I honestly don't think this is that bad, as long as my goals for this project are NOT just to get the highest place on kaggle. I genuinely don't think so. I could have copied the highest scoring public notebook and instantly get 300ths place, and probably fuck around with hyperparams and feature engineering to squeeze out a top 100. That not only doesn't seem fun, it doesn't seem productive.  Now after a long pause in data sci, I feel like tooling has become modern, and it's important to update my ways. Yes, prefect had some issues, but it also seems to have great momentum and response, so it's worth betting on it continuing to exist. One thing I still need to test is how easy it is to use all this in the cloud. I think this will be my afternoon. Could I really be done done done with infra???
+
+# 10/27
+
+Spent the morning reading papers that make use of pseudotime methods, and found some tools, possible best practices:
+
+Spent the afternoon doing more work on my pipelines to make my flow caching
+function into a reusable decorator. Did more research into mlflow usage, capabilities and best practices, because I really should be submitting to kaggle based on experimental results that are logged in MLFlow.
+
+# 10/26
+
+Iteration is slow testing these larger jobs. I think in general I need to spend more time setting up test cases that don't take too long to run. If an iteration is a minute or five, that not only slows development a lot but also causes focus-loss because you have to either wait or context switch during the training. Hard to overcome the overhead of and complexity of writing a "small" test case when you aren't yet sure if it will pay off, but I think prob need to make a rule for myself: if a test takes > 30s to run, rewrite.
+
+Decided to dig deeper into why wrapping a certain function in `@task` was causing a huge performance regression. I probably wouldn't do this if I was at a real job, but maybe I would. It's important to have some intuition for why things break. Then again, it's been too long since I actually iterated on real predictions. Filed a bug report, and also discovered a solution to some of these issues: tasks and flows should not return numpy objects. Making a task return a dataframe instead of a numpy object eliminated performance issues cause by wrapping in `@task`
+
+EOD, I think I finally have pipelines done for now. Starting research into how to use pseudotime algorithms as I think properly modeling temporal data will be the biggest advantage here. So far I've only seen people treating Day as a feature and maybe doing `GroupedKFold(day)`
+
+# 10/25
+
+Ok goal is to as quickly as possible (as possible) set up a simple caching function for flow outputs. Basically hyperparams, data, model. I think the biggest weak spot here is the "data". Need to rework slightly as an input..probably just function `__name__`.
+
+Got a solution working, though it took a lot longer than I hoped because apparently `hash` is not consistent across python runs. 
+
+Was also running into some serious slowness with writing output to csv, so switched to arrow/feather which is supposed to be faster for I/O.
+
+I also did more experiments with de-activating or removing all Prefect functionality to see if it was causing slowdowns. With prefect completely remove runtime was about the same as with it. The only exception, which I've confirmed again, is the `format_submission` task.
+
+# 10/24
+
+Still trying to figure out what do about pipelining. It's brought some nice benefits, such as how it stores metadata and puts it all in a nice web ui. But it's also caused performance issues which I can't afford. I'm also afraid it's become more of a distraction than an aid (though I can chalk of some of the dev time to amortizable learning and setup, it's getting to be too much). 
+
+Today I'm gonna do a blitz to try out dagster. If I have any problems, depending on how things go I'll either just go back to where I am now (using prefect) and manually implement some things, or continue with dagster and manually implement some things. Ok a few hours in and dagster is proving pretty annoying to work with. The main problem is all functions need to be rewritten as `ops` which is much more wonky than the simple `task`s of prefect. For example, you can't just pass arguments in to an `op`, you have to pass a dict of parameters to the decorator. This feels crazy...everything has to be checked at runtime then? or you have to write a separate dataclass for each function? Some parts of dagster seem great, for example the asset / materialization api seems to be just what I need for caching model results. I even set up a nice pipeline for getting the data from kaggle an unzipping it. However not worth the price. 
+
+
+# 10/22-10/23
+
+Did some more research into alternative tools. Airflow just seems like a bad idea, as people complain it's not that great locally, and looking at the docs, it doesn't seem very incrementalist. People had complained that Dagster was higher cognitive overhead than prefect, but I took a look at the docs and they actually made a lot of sense. The tool also seems easy to adopt incrementally. Most importantly it SEEMS to support caching of `jobs` (their version of prefect's `flow`). However, it's listed as an "experimental" feature. 
+
+Also, thinking about the `day` features, and how to best use them. Need to research ordinal features.
+
+# 10/21
+
+Refactoring workflow dag to cache more efficiently and merge and submit models more cleanly. Only problem is I'm running into some weird hanging behavior on the submission formatting that I've not had before. Gonna try uninstalling modin, and prefect-dask to ensure none of that bs is somehow getting in the way. This step used to take like 5min at most.
+
+I also deleted some `del` statements (thinking maybe the gc wasn't doing it's job) gonna test if that was the problem. Python was using ~17g of memory before, now...same. I take it back gc...ur good.
+
+Maybe it's because I put this function inside a prefect `task`? I took it out of the `task` wrapper and things went a lot faster. Maybe it's trying to cache or serialization too much?  This makes me worried about using prefect tasks. What is the true cost of wrapping a function in `task`?? Does this mean setting up lots of tasks and flows will be detrimental whenever you're on a single machine? Seems like it!
+
+Also caching is not working the way I expect (same params run twice will use cached data if available). But this is not happening. After a long investigation, it's turns out you can only cache tasks, but not flow. WTF!! This makes no sense. My question of "[how to cache flows](https://github.com/PrefectHQ/prefect/issues/7288)" turned into a feature request. Easy caching or memoization was basically the main reason I turned to 3rd party workflow tools in the first place!
+
+Side note: prefect seems not great at knowing when a flow/task has finished. Lots of tasks considered "running"
+
+
+
+# 10/20
+
+Ok bucko (jordan peterson voice), getting a bit sloppy on goals and follow through here. Today, hard deadline, get all experiment tracking set up, and do one experiment. MLFlow turned out to be quite easy to setup and nice to use. 
+
+Some mlflow issues to fix:
+```
+2022/10/20 12:17:25 WARNING mlflow.sklearn: Training metrics will not be recorded because training labels were not specified. To automatically record training metrics, provide training labels as inputs to the model training function.
+2022/10/20 12:17:25 WARNING mlflow.sklearn: Failed to infer model signature: the trained model does not specify a `predict` function, which is required in order to infer the signature
+2022/10/20 12:17:25 WARNING mlflow.sklearn: Model was missing function: predict. Not logging python_function flavor!
+```
+
+The bigger issue was trying to use dask with prefect. Led to big slowdowns on the larger data. First, got the following warning:
+```
+/Users/luke/projects/singlecell-kaggle/.venv/lib/python3.10/site-packages/distributed/worker.py:2823: UserWarning: Large object of size 89.76 MiB detected in task graph:
+  {'task': <prefect.tasks.Task object at 0x1333e28f0 ... ENABLED=True))}
+Consider scattering large objects ahead of time
+with client.scatter to reduce scheduler burden and
+keep data on workers
+
+    future = client.submit(func, big_data)    # bad
+
+    big_future = client.scatter(big_data)     # good
+    future = client.submit(func, big_future)  # good
+  warnings.warn(
+```
+
+Also getting this random error sometimes:
+```
+2022/10/20 14:26:13 WARNING mlflow.sklearn.utils: RegressorMixin.score failed. The 'training_score' metric will not be recorded. Scoring error: shapes (666,666) and (667,4) not aligned: 666 (dim 1) != 667 (dim 0)
+```
+Seem to happen when I use the `run` command in vscode:
+
+```
+ source /Users/luke/projects/singlecell-kaggle/.venv/bin/activate
+ /Users/luke/projects/singlecell-kaggle/.venv/bin/python /Users/luke/projects/singlecell-kaggle/code/rbf_pca_normed_input_output.py
+```
+
+...but not when I run the same script using `test.sh`. 
+
+This only happens when is use the `DaskTaskRunner`. It also seems to have wildly unpredictable compute times. 
+
+Given the problems I've been seeing with dask, gonna dump it for now and try `modin`. Modin seems immature. Lots of odd assertion and other errors littering logs even on successful runs. Also did not speed up things for my workflow (maybe not enough data manipulation yet?)
+![The slow numbers for each `max_rows_train` are all modin](2022-10-20-19-00-00.png)
+
+
+-----
+
+Meanwhile, mlflow throws an error:
+```
+INVALID_PARAMETER_VALUE: Model registry functionality is unavailable; got unsupported URI './mlruns' for model registry data storage. Supported URI schemes are: ['postgresql', 'mysql', 'sqlite', 'mssql']. See https://www.mlflow.org/docs/latest/tracking.html#storage for how to run an MLflow server against one of the supported backend storage locations.
+```
+Turns out this only is relevant if you're using it to serve models (I'm not).
+
+
 # 10/19
 
 Spent morning working on movie stuff and meeting with a friend. Now finishing up working out the kinks with making prefect work with dask. There is some async error going on. Goal for today to get experiment tracking with MLFlow and some automatic hyper-param optimization for smaller data. 
  
-Ran into some weird bugs with the python debugger using jupyter notebooks with the `DaskTaskRunner`. Switching to a scripts as notebooks are proving too unwieldy in this more mature phase. Then stayed up late into the researching experiment trackers as I'm getting cold feet on mlflow a bit. That said, it seems like the top choice, maybe other than WandB. ClearML also seems interesting. I'm going probably a bit to far into tool optimization, but hopefully I can not worry about tools for an ml project for a long time.
+Ran into some weird bugs with the python debugger using jupyter notebooks with the `DaskTaskRunner`. Switching to a scripts as notebooks are proving too unwieldy in this more mature phase. Then stayed up late into the researching experiment trackers as I'm getting cold feet on mlflow a bit. That said, it seems like the top choice, maybe other than WandB. ClearML also seems interesting. I'm going probably a bit too far into tool optimization, but hopefully I can not worry about tools for an ml project for a long time.
 
 # 10/18
 

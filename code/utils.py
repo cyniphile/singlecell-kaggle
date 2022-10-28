@@ -1,10 +1,20 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
+import functools
+import sys
+import dataclasses, json
+import importlib.util
+import logging
+import hashlib
+import inspect
+import json
 import os
 import pathlib
 import typing
+import mlflow  # type: ignore
 
 import numpy as np
 import scipy as sp  # type: ignore
+
 import pandas as pd
 from dataclasses import dataclass
 from prefect import flow, task, get_run_logger
@@ -12,6 +22,8 @@ from typing import Optional
 
 from sklearn.model_selection import KFold  # type: ignore
 from sklearn.decomposition import TruncatedSVD  # type: ignore
+
+logging.getLogger().setLevel(logging.INFO)
 
 
 def get_git_root():
@@ -36,13 +48,10 @@ SPARSE_DATA_DIR = project_root / "data" / "sparse"
 # Predictions Output data dir.
 OUTPUT_DIR = project_root / "data" / "submissions"
 
-# Predictions Output data dir.
-REDUCED_DIR = project_root / "data" / "reduced"
 
-
-for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR, REDUCED_DIR]:
+for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
     if not path.is_dir():
-        raise ValueError(f"directory not found: f{path}")
+        raise ValueError(f"directory not found: {path}")
 
 
 @dataclass
@@ -75,56 +84,6 @@ class TechnologyRepository:
 
 multi = TechnologyRepository("multi")
 cite = TechnologyRepository("cite")
-
-
-def format_submission(Y_pred_raw, repo: TechnologyRepository):
-    """
-    Takes a square matrix of `gene*cell` of the kind usually output
-    from models and formats it as necessary for submission to the
-    kaggle competition
-    """
-    logger = get_run_logger()
-    logger.info("Loading indices...")
-    test_index = np.load(
-        repo.test_inputs_sparse_idxcol_path,
-        allow_pickle=True,
-    )["index"]
-    y_columns = np.load(
-        repo.train_targets_sparse_idxcol_path,
-        allow_pickle=True,
-    )["columns"]
-
-    # Maps from row number to cell_id
-    cell_dict = dict((k, i) for i, k in enumerate(test_index))
-    assert len(cell_dict) == len(test_index)
-    gene_dict = dict((k, i) for i, k in enumerate(y_columns))
-    assert len(gene_dict) == len(y_columns)
-
-    assert len(y_columns) == Y_pred_raw.shape[1]
-    assert len(test_index) == Y_pred_raw.shape[0]
-    logger.info("Loading evaluation ids...")
-    eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
-
-    # Create two arrays of indices, so that for every row in long `eval_ids`
-    # list we have the coordinates of the corresponding value in the
-    # model's rectangular output matrix.
-    eval_ids_cell_num = eval_ids.cell_id.apply(lambda x: cell_dict.get(x, -1))
-    eval_ids_gene_num = eval_ids.gene_id.apply(lambda x: gene_dict.get(x, -1))
-    # Eval_id rows that have both and "x" and "y" index are valid
-    # TODO: should check that nothing has just one (x or y) index
-    valid_multi_rows = (eval_ids_gene_num != -1) & (eval_ids_cell_num != -1)
-    # create empty submission series
-    submission = pd.Series(
-        name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
-    )
-    logger.info("Final step: fill empty submission df...")
-    # Neat numpy trick to make a 1d array from 2d based on two arrays:
-    # one of "x" coordinates and one of "y" coordinates of the 2d array.
-    submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
-        eval_ids_cell_num[valid_multi_rows].to_numpy(),  # type: ignore
-        eval_ids_gene_num[valid_multi_rows].to_numpy(),  # type: ignore
-    ]
-    return submission
 
 
 def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -189,7 +148,8 @@ class Datasets:
     test_inputs: typing.Any
 
 
-# Prefect functions
+# Prefect pipeline functions
+
 
 def load_data(
     *,
@@ -235,25 +195,33 @@ def load_test_inputs(*, technology: TechnologyRepository, **kwargs):
 def load_all_data(
     technology: TechnologyRepository,
     max_rows_train: int,
-    submit_to_kaggle: bool,
+    full_submission: bool,
     sparse: bool,
 ):
-    train_inputs = load_test_inputs.submit(
-        technology=technology, max_rows_train=max_rows_train, sparse=sparse
+    train_inputs = load_test_inputs(
+        technology=technology,
+        max_rows_train=max_rows_train,
+        sparse=sparse,
     )
-    targets_train = load_train_targets.submit(
-        technology=technology, max_rows_train=max_rows_train
+    # Targets need to be in dense format for sklearn training :-(
+    targets_train = load_train_targets(
+        technology=technology,
+        max_rows_train=max_rows_train,
     )
-    if submit_to_kaggle:
-        test_inputs = load_test_inputs.submit(technology=technology, sparse=sparse)
+    # If submitting to kaggle need to load full test_inputs to generate
+    # a complete and valid submission
+    if full_submission:
+        test_inputs = load_test_inputs(technology=technology, sparse=sparse)
     else:
-        test_inputs = load_test_inputs.submit(
-            technology=technology, max_rows_train=max_rows_train, sparse=sparse
+        test_inputs = load_test_inputs(
+            technology=technology,
+            max_rows_train=max_rows_train,
+            sparse=sparse,
         )
     return Datasets(train_inputs, targets_train, test_inputs)
 
 
-@task()
+@task
 def truncated_pca(
     dataset, n_components, return_model: bool = False
 ) -> Tuple[np.ndarray, Optional[TruncatedSVD]]:
@@ -278,22 +246,20 @@ def pca_inputs(
     """
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
-    reduced_values, pca_model = truncated_pca.submit(
-        inputs, 
-        n_components, 
-        return_model
-    ).result() 
+    reduced_values, pca_model = truncated_pca(  # type: ignore
+        inputs,
+        n_components,
+        return_model,
+    )
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
     pca_train_inputs = reduced_values[: train_inputs.shape[0]]  # type: ignore
     # Last len(input_test) rows are input_test
     pca_test_inputs = reduced_values[train_inputs.shape[0] :]  # type: ignore
-    assert (
-        pca_train_inputs.shape[0]
-        + pca_test_inputs.shape[0]
-    # Black doing weird formatting here
     # fmt: off
+    assert (
+        pca_train_inputs.shape[0] + pca_test_inputs.shape[0]
     ) == reduced_values.shape[0]  # type: ignore
     # fmt: on
     return pca_train_inputs, pca_test_inputs, pca_model  # type: ignore
@@ -312,13 +278,14 @@ def fit_and_score_pca_targets(
     performs model fit and score where model is predicting a reduced
     pca vector that needs to be converted back to raw data space
     """
-    logger = get_run_logger()
+    logging = get_run_logger()
     model.fit(train_inputs, pca_train_targets)
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
     Y = pca_test_targets @ pca_model_targets.components_
     score = correlation_score(Y, Y_hat)
-    logger.info(f"Score: {score}")
+    mlflow.log_metric("Score", score)
+    logging.info(f"Score: {score}")
     return Score(score=score)
 
 
@@ -332,7 +299,7 @@ def k_fold_validation(
     k: int,
     **model_kwargs,
 ):
-    logger = get_run_logger()
+    logging = get_run_logger()
     kf = KFold(n_splits=k)
     scores = []
     for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_inputs)):
@@ -340,9 +307,8 @@ def k_fold_validation(
         fold_train_targets = train_targets[train_indices]
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
-        logger.info(f"Fitting fold {fold_index}...")
-        # Use `.submit` function to make Prefect do tasks concurrently
-        score = fit_and_score_func.submit(
+        logging.info(f"Fitting fold {fold_index}...")
+        score = fit_and_score_func(
             fold_train_inputs,
             fold_train_targets,
             fold_test_inputs,
@@ -350,6 +316,216 @@ def k_fold_validation(
             model=model,
             **model_kwargs,
         )
-        logger.info(f"Score {score} for fold {fold_index}")
+        logging.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
+
+
+@task
+def format_submission(Y_pred_raw, technology: TechnologyRepository):
+    """
+    Takes a square matrix of `gene*cell` of the kind usually output
+    from models and formats it as necessary for submission to the
+    kaggle competition
+    """
+    logging = get_run_logger()
+    logging.info("Loading indices...")
+    test_index = np.load(
+        technology.test_inputs_sparse_idxcol_path,
+        allow_pickle=True,
+    )["index"]
+    y_columns = np.load(
+        technology.train_targets_sparse_idxcol_path,
+        allow_pickle=True,
+    )["columns"]
+
+    # Maps from row number to cell_id
+    cell_dict = dict((k, i) for i, k in enumerate(test_index))
+    assert len(cell_dict) == len(test_index)
+    gene_dict = dict((k, i) for i, k in enumerate(y_columns))
+    assert len(gene_dict) == len(y_columns)
+
+    assert len(y_columns) == Y_pred_raw.shape[1]
+    assert len(test_index) == Y_pred_raw.shape[0]
+    logging.info("Loading evaluation ids...")
+    eval_ids = pd.read_parquet(f"{SPARSE_DATA_DIR}/evaluation.parquet")
+
+    # Create two arrays of indices, so that for every row in long `eval_ids`
+    # list we have the coordinates of the corresponding value in the
+    # model's rectangular output matrix.
+    eval_ids_cell_num = eval_ids.cell_id.apply(lambda x: cell_dict.get(x, -1))
+    eval_ids_gene_num = eval_ids.gene_id.apply(lambda x: gene_dict.get(x, -1))
+    # Eval_id rows that have both and "x" and "y" index are valid
+    # TODO: should check that nothing has just one (x or y) index
+    valid_multi_rows = (eval_ids_gene_num != -1) & (eval_ids_cell_num != -1)
+    # create empty submission series
+    submission = pd.Series(
+        name="target", index=pd.MultiIndex.from_frame(eval_ids), dtype=np.float32
+    )
+    logging.info("Final step: fill empty submission df...")
+
+    # Neat numpy trick to make a 1d array from 2d based on two arrays:
+    # one of "x" coordinates and one of "y" coordinates of the 2d array.
+    submission.iloc[valid_multi_rows] = Y_pred_raw[  # type: ignore
+        eval_ids_cell_num[valid_multi_rows].to_numpy(),  # type: ignore
+        eval_ids_gene_num[valid_multi_rows].to_numpy(),  # type: ignore
+    ]
+    # Need to convert to dataframe else prefect slows things down a lot
+    # https://github.com/PrefectHQ/prefect/issues/7065#issuecomment-1292345882
+    return pd.DataFrame(submission)
+
+
+# @task # very slow as task
+def _merge_submission(
+    this_technology_predictions,
+    other_technology_predictions,
+):
+    """
+    merge predictions for two technologies to make a full submission for both
+    """
+
+    # logging = get_run_logger()
+    # drop multi-index to align with other submission
+    reindexed_submission_this = this_technology_predictions.reset_index(drop=True)
+    # Merge with separate predictions for other technology
+    merged = reindexed_submission_this["target"].fillna(
+        other_technology_predictions[reindexed_submission_this["target"].isna()][
+            "target"
+        ]
+    )
+    # put into dataframe with proper column names
+    formatted_submission = pd.DataFrame(merged, columns=["target"])
+    formatted_submission.index.name = "row_id"
+    test_valid_submission(formatted_submission)
+    logging.info("finished merging")
+    return formatted_submission
+
+
+# @task
+def _submit_to_kaggle(merged_submission, submission_message: str):
+    # logging = get_run_logger()
+    # write full predictions to csv
+    submission_file_name = f"{str(OUTPUT_DIR)}/{submission_message}.csv"
+    logging.info(f"Writing {submission_file_name} locally for submission")
+    merged_submission.to_csv(submission_file_name)
+    logging.info(f"Submitting {submission_file_name} to kaggle ")
+    os.system(
+        f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{submission_message}"'
+    )
+
+
+class EnhancedJSONEncoder(json.JSONEncoder):
+    """
+    taken from https://stackoverflow.com/questions/51286748/make-the-python-json-encoder-support-pythons-new-dataclasses
+    used to encode dataclasses into json
+    """
+
+    def default(self, o):
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        return super().default(o)
+
+
+@dataclass
+class SubmissionExperiments:
+    cite_mlflow_id: str
+    multi_mlflow_id: str
+
+
+# @flow  # again, was slow on large inputs
+def _merge_and_submit(df_cite, df_multi, experiment_ids: SubmissionExperiments):
+    logging.info("starting merge")
+    merged = _merge_submission(df_cite, df_multi)
+    _submit_to_kaggle(merged, str(experiment_ids))
+
+
+@flow
+def run_or_get_cache(flow):
+    """
+    TODO: use https://docs.prefect.io/concepts/states/#states to mark if read.
+    Decorator for flows. Determine if it has been run before. If not
+    run and save results in arrow/feather file; if so return saved results.
+    """
+
+    logging = get_run_logger()
+
+    @functools.wraps(flow)
+    def wrapper(**kwargs):
+        try:
+            ignore_cache = kwargs.pop("ignore_cache")
+        except KeyError:
+            ignore_cache = False
+        try:
+            skip_caching = kwargs.pop("skip_caching")
+        except KeyError:
+            skip_caching = False
+        default_args_str = str(inspect.signature(flow).parameters)
+        overridden_args_str = json.dumps(
+            kwargs, sort_keys=True, cls=EnhancedJSONEncoder
+        )
+        hash_base = (default_args_str + overridden_args_str).encode("utf-8")
+        args_hash = str(int(hashlib.md5(hash_base).hexdigest(), 16))
+        filename = "-".join([flow.__name__, args_hash]) + ".arrow"
+        file_path = f"{OUTPUT_DIR}/{filename}"
+        if os.path.exists(file_path) and not ignore_cache:
+            logging.info(f"found cache {file_path}, skipping recalculation...")
+            submission = pd.read_feather(file_path)
+            return submission
+        else:
+            logging.info(f"no cache found, running flow {flow.__name__}")
+            submission = pd.DataFrame(flow(**kwargs)).reset_index()
+            if not skip_caching:
+                logging.info(f"flow completed, writing result to {file_path}")
+                submission.to_feather(file_path)
+                logging.info("finished caching")
+            return submission
+
+    return wrapper
+
+
+def _create_submission_based_on_experiment(
+    mlflow_run_id, technology: TechnologyRepository
+):
+    """
+    given an mlflow experiment, run the same experiment but trained on full
+    data with no cv holdout, and predict on full test input
+    assumes flow has: 1) annotated kwargs 2) a `full_submission` kwarg 3) a `technology` kwarg
+    TODO: should enforce this through an interface
+    https://stackoverflow.com/questions/2124190/how-do-i-implement-interfaces-in-python
+    """
+    run = mlflow.get_run(mlflow_run_id)
+    params = run.data.params
+    assert params["technology"] == str(technology)
+    flow_filepath = run.data.tags["mlflow.source.name"]
+    flow_function_name = params["flow_function"]
+    # import module and flow function of flow that created the model
+    spec = importlib.util.spec_from_file_location(flow_function_name, flow_filepath)
+    flow_module = importlib.util.module_from_spec(spec)  # type: ignore
+    sys.modules[flow_function_name] = flow_module
+    spec.loader.exec_module(flow_module)  # type: ignore
+    flow_function = getattr(flow_module, flow_function_name)
+    # set flow to have arguments of run
+    # overriding "full_submission" to be true
+    kwargs = {}
+    flow_kwargs = inspect.signature(flow_function).parameters
+    for key in flow_kwargs.keys():
+        # convert strings to necessary types
+        # requires that flow has type-annotated kwargs
+        kwargs[key] = flow_kwargs[key].annotation(params[key])
+    kwargs["full_submission"] = True
+    kwargs["technology"] = technology
+    return flow_function(**kwargs)
+
+
+def create_submission_from_mlflow_experiments(cite_mlflow_run_id, multi_mlflow_run_id):
+    """
+    public function to create a full kaggle submission based on previously run
+    experiments logged into mlflow. Pattern is to 1) do experiments 2) find
+    the best results in mlflow 3) take those experiment ids and input them
+    into this function which will re-train the experiments will full data,
+    create predictions for full test set, and submit to kaggle for scoring
+    """
+    c = _create_submission_based_on_experiment(cite_mlflow_run_id, cite)
+    m = _create_submission_based_on_experiment(multi_mlflow_run_id, multi)
+    s = SubmissionExperiments(c, m)
+    return _merge_and_submit(c, m, s)
