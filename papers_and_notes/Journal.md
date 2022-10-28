@@ -58,7 +58,7 @@ Side note: prefect seems not great at knowing when a flow/task has finished. Lot
 
 Ok bucko (jordan peterson voice), getting a bit sloppy on goals and follow through here. Today, hard deadline, get all experiment tracking set up, and do one experiment. MLFlow turned out to be quite easy to setup and nice to use. 
 
-Some mlflow issues to fix:
+Some mlflow issues TODO:
 ```
 2022/10/20 12:17:25 WARNING mlflow.sklearn: Training metrics will not be recorded because training labels were not specified. To automatically record training metrics, provide training labels as inputs to the model training function.
 2022/10/20 12:17:25 WARNING mlflow.sklearn: Failed to infer model signature: the trained model does not specify a `predict` function, which is required in order to infer the signature
