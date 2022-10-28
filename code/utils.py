@@ -41,6 +41,7 @@ project_root = pathlib.Path(get_git_root())
 
 # Original data from kaggle.
 DATA_DIR = project_root / "data" / "original"
+# TODO: implement for prod DATA_DIR = project_root / ".." /  "input" / "open-problems-multimodal"
 
 # Sparse data dir.
 SPARSE_DATA_DIR = project_root / "data" / "sparse"
