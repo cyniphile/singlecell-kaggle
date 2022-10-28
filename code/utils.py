@@ -402,15 +402,15 @@ def _merge_submission(
 
 
 # @task
-def _submit_to_kaggle(merged_submission, flow_context: Dict):
+def _submit_to_kaggle(merged_submission, submission_message: str):
     # logging = get_run_logger()
     # write full predictions to csv
-    submission_file_name = f"{str(OUTPUT_DIR)}/{flow_context['name']}.csv"
+    submission_file_name = f"{str(OUTPUT_DIR)}/{submission_message}.csv"
     logging.info(f"Writing {submission_file_name} locally for submission")
     merged_submission.to_csv(submission_file_name)
     logging.info(f"Submitting {submission_file_name} to kaggle ")
     os.system(
-        f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{str(flow_context)}"'
+        f'kaggle competitions submit -c open-problems-multimodal -f {submission_file_name} -m "{submission_message}"'
     )
 
 
@@ -426,13 +426,17 @@ class EnhancedJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+@dataclass
+class SubmissionExperiments:
+    cite_mlflow_id: str
+    multi_mlflow_id: str
+
+
 # @flow  # again, was slow on large inputs
-def _merge_and_submit(df_cite, df_multi):
+def _merge_and_submit(df_cite, df_multi, experiment_ids: SubmissionExperiments):
     logging.info("starting merge")
-    # TODO Should use MLFlow data, not prefect
-    # flow_context = prefect.context.get_run_context().flow_run.dict()
     merged = _merge_submission(df_cite, df_multi)
-    _submit_to_kaggle(merged, {"name": "TODO"})
+    _submit_to_kaggle(merged, str(experiment_ids))
 
 
 @flow
@@ -523,4 +527,5 @@ def create_submission_from_mlflow_experiments(cite_mlflow_run_id, multi_mlflow_r
     """
     c = _create_submission_based_on_experiment(cite_mlflow_run_id, cite)
     m = _create_submission_based_on_experiment(multi_mlflow_run_id, multi)
-    return _merge_and_submit(c, m)
+    s = SubmissionExperiments(c, m)
+    return _merge_and_submit(c, m, s)
