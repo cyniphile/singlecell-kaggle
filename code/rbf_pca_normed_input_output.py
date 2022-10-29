@@ -64,11 +64,11 @@ def last_year_rbf_flow(
         pca_train_inputs, pca_test_inputs, _ = pca_inputs(  # type: ignore
             train_inputs, test_inputs, inputs_pca_dims
         )
-        pca_train_targets, pca_model_targets = truncated_pca(  # type: ignore
+        pca_train_targets, pca_model_targets = truncated_pca.submit(  # type: ignore
             train_targets,
             targets_pca_dims,
             return_model=True,
-        )
+        ).result()
         # TODO: ensure float32 is best
         train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)  # type: ignore
         kernel = RBF(length_scale=scale)
@@ -80,7 +80,9 @@ def last_year_rbf_flow(
             krr.fit(train_norm, pca_train_targets)  # type: ignore
             logging.info("Predict on full submission inputs")
             Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
-            formatted_submission = utils.format_submission(Y_hat, technology)
+            formatted_submission = utils.format_submission.submit(
+                Y_hat, technology
+            ).result()
             return formatted_submission
         else:
             mlflow.sklearn.autolog()
@@ -88,7 +90,7 @@ def last_year_rbf_flow(
                 model=krr,
                 train_inputs=train_norm,
                 train_targets=pca_train_targets,  # type: ignore
-                fit_and_score_func=fit_and_score_pca_targets,
+                fit_and_score_task=fit_and_score_pca_targets,
                 k=k_folds,
                 pca_model_targets=pca_model_targets,  # type: ignore
             )

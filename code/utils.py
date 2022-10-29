@@ -204,26 +204,28 @@ def load_all_data(
     full_submission: bool,
     sparse: bool,
 ):
-    train_inputs = load_test_inputs(
+    train_inputs = load_test_inputs.submit(
         technology=technology,
         max_rows_train=max_rows_train,
         sparse=sparse,
-    )
+    ).result()
     # Targets need to be in dense format for sklearn training :-(
-    targets_train = load_train_targets(
+    targets_train = load_train_targets.submit(
         technology=technology,
         max_rows_train=max_rows_train,
-    )
+    ).result()
     # If submitting to kaggle need to load full test_inputs to generate
     # a complete and valid submission
     if full_submission:
-        test_inputs = load_test_inputs(technology=technology, sparse=sparse)
+        test_inputs = load_test_inputs.submit(
+            technology=technology, sparse=sparse
+        ).result()
     else:
-        test_inputs = load_test_inputs(
+        test_inputs = load_test_inputs.submit(
             technology=technology,
             max_rows_train=max_rows_train,
             sparse=sparse,
-        )
+        ).result()
     return Datasets(train_inputs, targets_train, test_inputs)
 
 
@@ -252,11 +254,11 @@ def pca_inputs(
     """
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
-    reduced_values, pca_model = truncated_pca(  # type: ignore
+    reduced_values, pca_model = truncated_pca.submit(  # type: ignore
         inputs,
         n_components,
         return_model,
-    )
+    ).result()
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
@@ -301,7 +303,7 @@ def k_fold_validation(
     model,  # model object with `.fit()` and `.predict()` methods
     train_inputs,
     train_targets,
-    fit_and_score_func,
+    fit_and_score_task,
     k: int,
     **model_kwargs,
 ):
@@ -314,14 +316,14 @@ def k_fold_validation(
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
         logging.info(f"Fitting fold {fold_index}...")
-        score = fit_and_score_func(
+        score = fit_and_score_task.submit(
             fold_train_inputs,
             fold_train_targets,
             fold_test_inputs,
             fold_test_targets,
             model=model,
             **model_kwargs,
-        )
+        ).result()
         logging.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
