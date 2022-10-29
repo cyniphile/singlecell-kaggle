@@ -6,6 +6,7 @@ import importlib.util
 import logging
 import hashlib
 import inspect
+import datetime
 import json
 import os
 import pathlib
@@ -18,6 +19,7 @@ import scipy as sp  # type: ignore
 import pandas as pd
 from dataclasses import dataclass
 from prefect import flow, task, get_run_logger
+from prefect.tasks import task_input_hash
 from typing import Optional
 
 from sklearn.model_selection import KFold  # type: ignore
@@ -40,8 +42,11 @@ def get_git_root():
 project_root = pathlib.Path(get_git_root())
 
 # Original data from kaggle.
-DATA_DIR = project_root / "data" / "original"
-# TODO: implement for prod DATA_DIR = project_root / ".." /  "input" / "open-problems-multimodal"
+try:
+    assert os.environ["SATURN_RESOURCE_NAME"] == "openproblems-bio-2022"
+    DATA_DIR = project_root / ".." / "input" / "open-problems-multimodal"
+except KeyError:
+    DATA_DIR = project_root / "data" / "original"
 
 # Sparse data dir.
 SPARSE_DATA_DIR = project_root / "data" / "sparse"
@@ -222,7 +227,7 @@ def load_all_data(
     return Datasets(train_inputs, targets_train, test_inputs)
 
 
-@task
+@task(cache_key_fn=task_input_hash)
 def truncated_pca(
     dataset, n_components, return_model: bool = False
 ) -> Tuple[np.ndarray, Optional[TruncatedSVD]]:
