@@ -70,14 +70,14 @@ def last_year_rbf_flow(
             return_model=True,
         ).result()
         # TODO: ensure float32 is best
-        train_norm = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)  # type: ignore
+        norm_pca_train_inputs = utils.row_wise_std_scaler(pca_train_inputs).astype(np.float32)  # type: ignore
         kernel = RBF(length_scale=scale)
         krr = KernelRidge(alpha=alpha, kernel=kernel)  # type: ignore
         if full_submission:
             mlflow.sklearn.autolog()
             test_norm = utils.row_wise_std_scaler(pca_test_inputs).astype(np.float32)  # type: ignore
             logging.info("Fit full model on all training data")
-            krr.fit(train_norm, pca_train_targets)  # type: ignore
+            krr.fit(norm_pca_train_inputs, pca_train_targets)  # type: ignore
             logging.info("Predict on full submission inputs")
             Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
             formatted_submission = utils.format_submission.submit(
@@ -88,13 +88,13 @@ def last_year_rbf_flow(
             mlflow.sklearn.autolog()
             scores: List[utils.Score] = k_fold_validation(
                 model=krr,
-                train_inputs=train_norm,
+                train_inputs=norm_pca_train_inputs,
                 train_targets=pca_train_targets,  # type: ignore
                 fit_and_score_task=fit_and_score_pca_targets,
                 k=k_folds,
                 pca_model_targets=pca_model_targets,  # type: ignore
             )
-            score_summary = ScoreSummary(scores)
+            return ScoreSummary(scores)
 
 
 if __name__ == "__main__":
@@ -108,5 +108,6 @@ if __name__ == "__main__":
         last_year_rbf_flow(**args_dict)  # type: ignore
     else:
         # run with default test params, and caching disabled
+        last_year_rbf_flow()  # type: ignore
         last_year_rbf_flow(ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
         last_year_rbf_flow(ignore_cache=True, skip_caching=True)  # type: ignore

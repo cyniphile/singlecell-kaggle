@@ -204,13 +204,13 @@ def load_all_data(
     full_submission: bool,
     sparse: bool,
 ):
-    train_inputs = load_test_inputs.submit(
+    train_inputs = load_train_inputs.submit(
         technology=technology,
         max_rows_train=max_rows_train,
         sparse=sparse,
     ).result()
     # Targets need to be in dense format for sklearn training :-(
-    targets_train = load_train_targets.submit(
+    train_targets = load_train_targets.submit(
         technology=technology,
         max_rows_train=max_rows_train,
     ).result()
@@ -226,7 +226,7 @@ def load_all_data(
             max_rows_train=max_rows_train,
             sparse=sparse,
         ).result()
-    return Datasets(train_inputs, targets_train, test_inputs)
+    return Datasets(train_inputs, train_targets, test_inputs)
 
 
 @task(cache_key_fn=task_input_hash)
@@ -481,12 +481,17 @@ def run_or_get_cache(flow):
             return submission
         else:
             logging.info(f"no cache found, running flow {flow.__name__}")
-            submission = pd.DataFrame(flow(**kwargs)).reset_index()
-            if not skip_caching:
+            # If submission returns a ScoreSummary don't try to cache.
+            # Also don't cache if we say not to cache it
+            submission_flow_result = flow(**kwargs)
+            if skip_caching or type(submission_flow_result) is ScoreSummary:
+                return submission_flow_result
+            else:
+                submission = pd.DataFrame(submission_flow_result).reset_index()
                 logging.info(f"flow completed, writing result to {file_path}")
                 submission.to_feather(file_path)
                 logging.info("finished caching")
-            return submission
+                return submission
 
     return wrapper
 
@@ -504,7 +509,9 @@ def _create_submission_based_on_experiment(
     run = mlflow.get_run(mlflow_run_id)
     params = run.data.params
     assert params["technology"] == str(technology)
-    flow_filepath = run.data.tags["mlflow.source.name"]
+    # TODO: doesn't work if function wasn't run from __main__
+    # flow_filepath = run.data.tags["mlflow.source.name"]
+    flow_filepath = "/kaggle/singlecell-kaggle/code/rbf_pca_normed_input_output.py"
     flow_function_name = params["flow_function"]
     # import module and flow function of flow that created the model
     spec = importlib.util.spec_from_file_location(flow_function_name, flow_filepath)

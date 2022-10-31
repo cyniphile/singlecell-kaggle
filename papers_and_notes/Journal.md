@@ -4,7 +4,13 @@ While I still have some free saturn cloud hours I'm going to figure out this par
 
 First, caching does, in fact, seem to work. Jobs are getting marked as "cached" and run for 0s
 
-Might need to look into understanding prefect deployments and agents some more. Ok, so a "deployment" is a flow that's packed up to be run anywhere (as defined in a yaml file). Once you've converted a flow to a deployment, then you  can submit it to "agents" which are basically servers configured to listen for work. It seems pretty simple! There seems to be some "concurrency limit", but otherwise not sure how work is balanced across resources. I think this is a bit more the role of dask. Only problem is that my caching decorator breaks in this setting. 
+Might need to look into understanding prefect deployments and agents some more. Ok, so a "deployment" is a flow that's packed up to be run anywhere (as defined in a yaml file). Once you've converted a flow to a deployment, then you  can submit it to "agents" which are basically servers configured to listen for work. It seems pretty simple! There seems to be some "concurrency limit", but otherwise not sure how work is balanced across resources. I think this is a bit more the role of dask. Only problem is that my caching decorator breaks in this setting.
+
+Ya know, re-looking at the results of my weekend experiments, I really am over-engineering infra at this point. My infra works well! So what if I'm sorta messily duplicating notebooks with different params at this point, mlflow makes that ok! I only have one box to work with anyway, so I can manually tune how much work I want it to do. 
+
+There seems be an issue where ipykernel on saturn cloud "dies" after awhile, but the work seems to continue?
+
+
 
 
 #  10/29 - 10/30
@@ -15,6 +21,12 @@ Also need to fix caching for non `--full_submission` jobs.
 The uncertainty of `failed` or `running` in prefect now seems rather serious as I'm unsure whether to restart certain jobs. https://github.com/PrefectHQ/prefect/issues/7239
 
 Also, caching seems to not be working, might have to use "local save" flag. 
+
+I just manually ran a bunch of jobs with various settings in notebooks on the server. Felt like I wasn't maxing out my infra as well as I could, but feels like a decent system so far. Getting good logs, good model observability. One thing, need to have train scores be the same as the evaluation metric (the weird correlation). As is I'm just getting r2 scores which is an ok proxy but hard to tell if I'm over/under fitting. 
+
+So far, some pretty exciting results according to my CV! Definitely getting there with "loose" (overfit) models, so we'll see if the results hold up on the LB. Sometimes overfitting is the way though...
+
+Finally, showing the payoff on the infra I've put together. I think I could do it all again in 20% the time for my next project, and it's leading me to a really robust, trustworthy experimentation process.
 
 
 # 10/28
