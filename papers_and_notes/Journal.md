@@ -1,6 +1,25 @@
+# 10/31
+
+While I still have some free saturn cloud hours I'm going to figure out this parallelism problem. Transitioning to a cloud infra is a little more work than I was (foolishly) expecting, but hope it won't take more than today. 
+
+First, caching does, in fact, seem to work. Jobs are getting marked as "cached" and run for 0s
+
+Might need to look into understanding prefect deployments and agents some more. Ok, so a "deployment" is a flow that's packed up to be run anywhere (as defined in a yaml file). Once you've converted a flow to a deployment, then you  can submit it to "agents" which are basically servers configured to listen for work. It seems pretty simple! There seems to be some "concurrency limit", but otherwise not sure how work is balanced across resources. I think this is a bit more the role of dask. Only problem is that my caching decorator breaks in this setting. 
+
+
+#  10/29 - 10/30
+
+Seems like tasks aren't running asynchronously. Go back to trying out https://docs.prefect.io/tutorials/execution/
+Also need to fix caching for non `--full_submission` jobs. 
+
+The uncertainty of `failed` or `running` in prefect now seems rather serious as I'm unsure whether to restart certain jobs. https://github.com/PrefectHQ/prefect/issues/7239
+
+Also, caching seems to not be working, might have to use "local save" flag. 
+
+
 # 10/28
 
-Spent the morning implementing a function that, given mlflow experiments, will retrain, predict, and submit. This really show the power of mlflow, in that I can screw around with experiments, go back and find which ones did the best, and just paste those IDs into this function to submit. Seems soo easy and fault tolerant. I'm reflecting on how much time I've spent on pipelines and infra. Was it worth it? I spent two weeks researching, testing, and getting a truly production-ready pipeline setup. I honestly don't think this is that bad, as long as my goals for this project are NOT just to get the highest place on kaggle. I genuinely don't think so. I could have copied the highest scoring public notebook and instantly get 300ths place, and probably fuck around with hyperparams and feature engineering to squeeze out a top 100. That not only doesn't seem fun, it doesn't seem productive.  Now after a long pause in data sci, I feel like tooling has become modern, and it's important to update my ways. Yes, prefect had some issues, but it also seems to have great momentum and response, so it's worth betting on it continuing to exist. One thing I still need to test is how easy it is to use all this in the cloud. I think this will be my afternoon. Could I really be done done done with infra???
+Spent the morning implementing a function that, given mlflow experiments, will retrain, predict, and submit. This really show the power of mlflow, in that I can screw around with experiments, go back and find which ones did the best, and just paste those IDs into this function to submit. Seems soo easy and fault tolerant. I'm reflecting on how much time I've spent on pipelines and infra. Was it worth it? I spent two weeks researching, testing, and getting a truly production-ready pipeline setup. I honestly don't think this is that bad, as long as my goals for this project are NOT just to get the highest place on kaggle. I genuinely don't think so. I could have copied the highest scoring public notebook and instantly get 300ths place, and probably fuck around with hyperparams and feature engineering to squeeze out a top 100. That not only doesn't seem fun, it doesn't seem productive.  Now after a long pause in data sci, I feel like tooling has become modern, and it's important to update my ways. Yes, prefect had some issues, but it also seems to have great momentum and response, so it's worth betting on it continuing to exist. One thing I still need to test is how easy it is to use all this in the cloud. I think this will be my afternoon. Could I really be done done done with infra???. Got mlflow working as an accessible server running on saturn cloud, nice! Now I can submit experiments with confidence and abandon.
 
 # 10/27
 
