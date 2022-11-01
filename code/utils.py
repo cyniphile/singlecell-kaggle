@@ -204,6 +204,7 @@ def load_all_data(
     full_submission: bool,
     sparse: bool,
 ):
+    # train_inputs = load_test_inputs.submit(
     train_inputs = load_train_inputs.submit(
         technology=technology,
         max_rows_train=max_rows_train,
@@ -511,14 +512,15 @@ def _create_submission_based_on_experiment(
     assert params["technology"] == str(technology)
     # TODO: doesn't work if function wasn't run from __main__
     # flow_filepath = run.data.tags["mlflow.source.name"]
-    flow_filepath = "/kaggle/singlecell-kaggle/code/rbf_pca_normed_input_output.py"
-    flow_function_name = params["flow_function"]
+    # flow_filepath = "/kaggle/singlecell-kaggle/code/rbf_pca_normed_input_output.py"
+    flow_filepath = params["flow_filepath"]
+    flow_function = params["flow_function"]
     # import module and flow function of flow that created the model
-    spec = importlib.util.spec_from_file_location(flow_function_name, flow_filepath)
+    spec = importlib.util.spec_from_file_location(flow_function, flow_filepath)
     flow_module = importlib.util.module_from_spec(spec)  # type: ignore
-    sys.modules[flow_function_name] = flow_module
+    sys.modules[flow_function] = flow_module
     spec.loader.exec_module(flow_module)  # type: ignore
-    flow_function = getattr(flow_module, flow_function_name)
+    flow_function = getattr(flow_module, flow_function)
     # set flow to have arguments of run
     # overriding "full_submission" to be true
     kwargs = {}

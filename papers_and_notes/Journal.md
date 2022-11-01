@@ -1,3 +1,7 @@
+# 11/1
+
+Damn, lots of hardware issues last night after all. Many jobs suddenly die. I _think_ it's because I'm running out of memory, as it happens when lots of jobs are running and also tends to happen for multi much more easily. I don't know for sure though. Might need to enable swap space, as it seems for the most part memory is not used up. 
+
 # 10/31
 
 While I still have some free saturn cloud hours I'm going to figure out this parallelism problem. Transitioning to a cloud infra is a little more work than I was (foolishly) expecting, but hope it won't take more than today. 
@@ -10,7 +14,11 @@ Ya know, re-looking at the results of my weekend experiments, I really am over-e
 
 There seems be an issue where ipykernel on saturn cloud "dies" after awhile, but the work seems to continue?
 
+Ugh. Found a big bug where I was loading the wrong data. Might have over engineered how I was getting the data. Too many layers of manually matching of "train_test" "test_target". 
 
+Retraining some models and (surprise) they are taking a lot longer with the full train set (which is much bigger). 
+
+Thinking deep learning might be a good next step to take the time structure into account. 
 
 
 #  10/29 - 10/30

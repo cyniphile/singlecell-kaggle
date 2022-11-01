@@ -1,4 +1,5 @@
 import utils
+import os
 from typing import List
 import inspect
 import argparse
@@ -15,7 +16,6 @@ from utils import (
 )
 import numpy as np
 from prefect import flow, get_run_logger
-from prefect.filesystems import LocalFileSystem
 import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
@@ -25,6 +25,8 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 # By default, Prefect makes a best effort to compute a
 # table hash of the .py file in which the flow is defined to
 # automatically detect when your code changes.
+# TODO: refactor to not be a decorator, instead just run as a subflow in the
+# `full_submission` branch.
 @run_or_get_cache
 @flow(
     name="RBF with Input and Target PCA",
@@ -49,6 +51,7 @@ def last_year_rbf_flow(
         mlflow.log_params(locals())
         # log name of function so it can be called later
         mlflow.log_param("flow_function", inspect.currentframe().f_code.co_name)  # type: ignore
+        mlflow.log_param("flow_filepath", os.path.realpath(__file__))
         logging = get_run_logger()
         data: Datasets = load_all_data(  # type: ignore
             technology=technology,
