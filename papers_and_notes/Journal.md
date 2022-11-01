@@ -1,6 +1,8 @@
 # 11/1
 
-Damn, lots of hardware issues last night after all. Many jobs suddenly die. I _think_ it's because I'm running out of memory, as it happens when lots of jobs are running and also tends to happen for multi much more easily. I don't know for sure though. Might need to enable swap space, as it seems for the most part memory is not used up. 
+Damn, lots of hardware issues last night after all. Many jobs suddenly die. I _think_ it's because I'm running out of memory, as it happens when lots of jobs are running and also tends to happen for multi much more easily. I don't know for sure though. Might need to enable swap space, as it seems for the most part memory is not used up.
+
+I might just need to do a more serious profile of memory usage. Memory use suddenly exploding when fitting RBF. TODO: Investigate memory scaling of this kind of model. 
 
 # 10/31
 

@@ -414,7 +414,8 @@ def _merge_submission(
 def _submit_to_kaggle(merged_submission, submission_message: str):
     # logging = get_run_logger()
     # write full predictions to csv
-    submission_file_name = f"{str(OUTPUT_DIR)}/{submission_message}.csv"
+    file_safe_message = "".join(x for x in submission_message if x.isalnum())
+    submission_file_name = f"{str(OUTPUT_DIR)}/{file_safe_message}.csv"
     logging.info(f"Writing {submission_file_name} locally for submission")
     merged_submission.to_csv(submission_file_name)
     logging.info(f"Submitting {submission_file_name} to kaggle ")
@@ -439,6 +440,9 @@ class EnhancedJSONEncoder(json.JSONEncoder):
 class SubmissionExperiments:
     cite_mlflow_id: str
     multi_mlflow_id: str
+
+    def __str__(self):
+        return f"cite-{self.cite_mlflow_id}--multi-{self.multi_mlflow_id}"
 
 
 # @flow  # again, was slow on large inputs
@@ -544,5 +548,5 @@ def create_submission_from_mlflow_experiments(cite_mlflow_run_id, multi_mlflow_r
     """
     c = _create_submission_based_on_experiment(cite_mlflow_run_id, cite)
     m = _create_submission_based_on_experiment(multi_mlflow_run_id, multi)
-    s = SubmissionExperiments(c, m)
+    s = SubmissionExperiments(cite_mlflow_run_id, multi_mlflow_run_id)
     return _merge_and_submit(c, m, s)
