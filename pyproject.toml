@@ -14,21 +14,21 @@ sklearn = "^0.0"
 tables = "^3.7.0"
 ipykernel = "^6.17.0"
 kaggle = "^1.5.12"
-prefect = "^2.6.5"
 mlflow = "^1.30.0"
 hdf5plugin = "^3.3.1"
 packaging = "^21.3"
 h5py = "^3.7.0"
-prefect-dask = "^0.2.1"
 bokeh = "2.4.3"
+prefect = "^2.6.6"
+prefect-dask = "^0.2.1"
 
 [tool.poetry.dev-dependencies]
-pandas-stubs = "^1.5.0"
+ipdb = "^0.13.9"
+memray = "^1.4.0"
 mypy = "^0.982"
 black = "^22.10.0"
 pip-tools = "^6.9.0"
-memray = "^1.4.0"
-ipdb = "^0.13.9"
+pandas-stubs = "^1.5.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

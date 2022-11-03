@@ -1272,9 +1272,9 @@ pillow==9.3.0 ; python_version >= "3.7" \
     # via
     #   -r requirements.txt
     #   bokeh
-prefect==2.6.5 ; python_version >= "3.7" \
-    --hash=sha256:3f9b292959d7808ff025e1c28c8f621daa2ad59af7de0d41f6d6734bc38aad63 \
-    --hash=sha256:45c90a97447ab771bfccbb3bb51b12797453d8b55e6cd207b55b3d325a5bada2
+prefect==2.6.6 ; python_version >= "3.7" \
+    --hash=sha256:553bba834f7242aa2c2607adc5b25cf738f44c791bbc305f6dc0d7a735f8a26d \
+    --hash=sha256:bc1528c411ef791c0977d81c960a8dc8b44acc4d106fba45fe047f3888492e5c
     # via
     #   -r requirements.txt
     #   prefect-dask

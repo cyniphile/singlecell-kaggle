@@ -1,8 +1,34 @@
+# 11/3
+
+Did some more memory profiling. Using `SequentialTaskRunner` decreased peak memory by 22%. I was still seeing some large objects from `.load_data()` in the peak report. I could be reading the graph incorrectly, but seems almost like large objects aren't being de-allocated properly, so doing some manual `del df; gc.collect()` to see if that helps. Before (and this didn't help) I had been doing just `del` without `gc.collect()` but who knows (I think the technique is more for notebooks). Aaand yes, the python gc DOES work by itself (no change at all in peak mem usage). 
+
+That said I think I need more reduction of peak mem.
+
+One option, switch to SVR, but I'd rather purse later as I seem to be getting good models as is: https://scikit-learn.org/stable/auto_examples/miscellaneous/plot_kernel_ridge_regression.html#:~:text=They%20differ%20in%20the%20loss,than%20SVR%20at%20prediction%2Dtime. I'm also not sure if SVR, though faster for larger data, uses less memory. 
+
+I'm gonna dive into Dask more deeply, because out of core memory stuff is supposed to be its key value add.
+
+I'm being reminded that I've not really done a proper learning curve yet. I so have SOME data from past submission where, (with 128 input/output dims) I got a slightly better score going from 25k row (.801 -> .802). Gonna do a submission with what I CAN do (50k rows multi/cite) just to see how things work.
+
+Another way to solve these memory issues is to loop over each output and train a model for each. Sklearn seems to be poor at optimizing this. 
+
+#11/2
+
+Several goals for today, the biggest is to reduce memory usage. To do that I'm going to need to learn how to use memray, probably use dask. 
+
+Spend a long time on a wild good chase trying to get dask's visualizer to work, culminating with this bug report: https://github.com/dask/distributed/issues/7244. Re-learned to use `ipdb.set_trace()` the good old fashioned way when vscode's debugger wasn't working. Big waste of time in general, but so it goes. 
+
+Did some memray profiling with memray. I guess not surprising, but Dask for prefect increases peak memory usage (doing stuff in parallel doi)
+
 # 11/1
 
 Damn, lots of hardware issues last night after all. Many jobs suddenly die. I _think_ it's because I'm running out of memory, as it happens when lots of jobs are running and also tends to happen for multi much more easily. I don't know for sure though. Might need to enable swap space, as it seems for the most part memory is not used up.
 
-I might just need to do a more serious profile of memory usage. Memory use suddenly exploding when fitting RBF. TODO: Investigate memory scaling of this kind of model. 
+I might just need to do a more serious profile of memory usage. Memory use suddenly exploding when fitting RBF. Might be better to use an SVM as they scale better? Or another model entirely that parallelizes better?
+
+Ended up screwing around fairly inefficiently with different task runners for prefect, but I think the real problem is the memory consumption of the core task logic. I found memray for memory optimization did some more research on dask. I think doing a solid memory profile of my code + daskifying some key parts of it will help greatly.
+
+I did managed to get some slow/inefficient cv in and both CITE and Multi models seem quite promising. 
 
 # 10/31
 

@@ -1318,7 +1318,7 @@ test = ["appdirs (==1.4.4)", "pytest-cov (>=2.7)", "pytest-mock (>=3.6)", "pytes
 
 [[package]]
 name = "prefect"
-version = "2.6.5"
+version = "2.6.6"
 description = "Workflow orchestration and management."
 category = "main"
 optional = false
@@ -2116,7 +2116,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "flake8 
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10,<3.11"
-content-hash = "766b213c46a18c1e0c043f2f7a8c3b85987ca48495fe77c938b6cfbd5bf686c5"
+content-hash = "7f1393ab11222f36254ed2bc8fd9bf589b89cd0de1251e394f1a420d972c600f"
 
 [metadata.files]
 aiofiles = []
