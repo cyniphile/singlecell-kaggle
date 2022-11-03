@@ -1,4 +1,5 @@
 import utils
+import gc
 import os
 from typing import List
 import inspect
@@ -20,19 +21,20 @@ import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
 
-# from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
 
 # By default, Prefect makes a best effort to compute a
 # table hash of the .py file in which the flow is defined to
 # automatically detect when your code changes.
 # TODO: refactor to not be a decorator, instead just run as a subflow in the
 # `full_submission` branch.
-@run_or_get_cache
+# @run_or_get_cache
 @flow(
     name="RBF with Input and Target PCA",
     description="Based on last year's winner of RNA->Prot",
-    # persist_result=True,
+    # persist_result=True,  # TODO: could be a way to turn this into a cache result
     # result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
+    # task_runner=ConcurrentTaskRunner(),
+    # task_runner=SequentialTaskRunner(),
     # task_runner=DaskTaskRunner(),
 )
 def last_year_rbf_flow(
@@ -82,6 +84,10 @@ def last_year_rbf_flow(
             logging.info("Fit full model on all training data")
             krr.fit(norm_pca_train_inputs, pca_train_targets)  # type: ignore
             logging.info("Predict on full submission inputs")
+            Y_hat_train = krr.predict(norm_pca_train_inputs) @ pca_model_targets.components_  # type: ignore
+            Y_train = pca_train_targets @ pca_model_targets.components_  # type: ignore
+            train_score = utils.correlation_score(Y_train, Y_hat_train)
+            mlflow.log_metric("training_score_correlation", train_score)
             Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
             formatted_submission = utils.format_submission.submit(
                 Y_hat, technology
@@ -111,6 +117,8 @@ if __name__ == "__main__":
         last_year_rbf_flow(**args_dict)  # type: ignore
     else:
         # run with default test params, and caching disabled
-        last_year_rbf_flow()  # type: ignore
-        last_year_rbf_flow(ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
-        last_year_rbf_flow(ignore_cache=True, skip_caching=True)  # type: ignore
+        # last_year_rbf_flow()  # type: ignore
+        # last_year_rbf_flow(max_rows_train=5000, ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
+        # last_year_rbf_flow(max_rows_train=5000, ignore_cache=True, skip_caching=True)  # type: ignore
+        last_year_rbf_flow(max_rows_train=1000, full_submission=True)  # type: ignore
+        # last_year_rbf_flow(max_rows_train=5000)  # type: ignore
