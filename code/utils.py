@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import functools
 import sys
 import dataclasses, json
@@ -6,22 +6,18 @@ import importlib.util
 import logging
 import hashlib
 import inspect
-import datetime
 import json
 import os
 import pathlib
 import typing
 import mlflow  # type: ignore
-
 import numpy as np
 import scipy as sp  # type: ignore
-
 import pandas as pd
 from dataclasses import dataclass
 from prefect import flow, task, get_run_logger
 from prefect.tasks import task_input_hash
 from typing import Optional
-
 from sklearn.model_selection import KFold  # type: ignore
 from sklearn.decomposition import TruncatedSVD  # type: ignore
 
@@ -204,7 +200,6 @@ def load_all_data(
     full_submission: bool,
     sparse: bool,
 ):
-    # train_inputs = load_test_inputs.submit(
     train_inputs = load_train_inputs.submit(
         technology=technology,
         max_rows_train=max_rows_train,
@@ -282,6 +277,7 @@ def fit_and_score_pca_targets(
     pca_test_targets,
     model,
     pca_model_targets: TruncatedSVD,
+    # pca_model_inputs: TruncatedSVD,
 ) -> Score:
     """
     performs model fit and score where model is predicting a reduced
@@ -291,10 +287,15 @@ def fit_and_score_pca_targets(
     model.fit(train_inputs, pca_train_targets)
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
+    # TODO: eventually uncomment and rework to have proper training score
+    # but don't want to add extra memory overhead rn and r2 isn't horrible
+    # Y_hat_train = model.predict(train_inputs) @ pca_model_inputs.components_
     Y = pca_test_targets @ pca_model_targets.components_
     score = correlation_score(Y, Y_hat)
-    mlflow.log_metric("Score", score)
-    logging.info(f"Score: {score}")
+    mlflow.log_metric("Test Score", score)
+    logging.info(f"Test Score: {score}")
+    mlflow.log_metric("Test Score", score)
+    logging.info(f"Test Score: {score}")
     return Score(score=score)
 
 
@@ -392,8 +393,6 @@ def _merge_submission(
     """
     merge predictions for two technologies to make a full submission for both
     """
-
-    # logging = get_run_logger()
     # drop multi-index to align with other submission
     reindexed_submission_this = this_technology_predictions.reset_index(drop=True)
     # Merge with separate predictions for other technology
@@ -412,7 +411,6 @@ def _merge_submission(
 
 # @task
 def _submit_to_kaggle(merged_submission, submission_message: str):
-    # logging = get_run_logger()
     # write full predictions to csv
     file_safe_message = "".join(x for x in submission_message if x.isalnum())
     submission_file_name = f"{str(OUTPUT_DIR)}/{file_safe_message}.csv"
@@ -460,6 +458,7 @@ def run_or_get_cache(flow):
     run and save results in arrow/feather file; if so return saved results.
     """
 
+    # TODO: not working if flow was run with "full_submission=True" before
     logging = get_run_logger()
 
     @functools.wraps(flow)

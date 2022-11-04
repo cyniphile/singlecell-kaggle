@@ -1,5 +1,4 @@
 import utils
-import gc
 import os
 from typing import List
 import inspect
@@ -22,20 +21,15 @@ from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
 
 
-# By default, Prefect makes a best effort to compute a
-# table hash of the .py file in which the flow is defined to
-# automatically detect when your code changes.
 # TODO: refactor to not be a decorator, instead just run as a subflow in the
 # `full_submission` branch.
 # @run_or_get_cache
 @flow(
     name="RBF with Input and Target PCA",
     description="Based on last year's winner of RNA->Prot",
-    # persist_result=True,  # TODO: could be a way to turn this into a cache result
+    # TODO: could be a way to turn this into a cache result
+    # persist_result=True,
     # result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
-    # task_runner=ConcurrentTaskRunner(),
-    # task_runner=SequentialTaskRunner(),
-    # task_runner=DaskTaskRunner(),
 )
 def last_year_rbf_flow(
     # default params used for testing
@@ -117,8 +111,8 @@ if __name__ == "__main__":
         last_year_rbf_flow(**args_dict)  # type: ignore
     else:
         # run with default test params, and caching disabled
-        # last_year_rbf_flow()  # type: ignore
+        last_year_rbf_flow()  # type: ignore
         # last_year_rbf_flow(max_rows_train=5000, ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
         # last_year_rbf_flow(max_rows_train=5000, ignore_cache=True, skip_caching=True)  # type: ignore
-        last_year_rbf_flow(max_rows_train=1000, full_submission=True)  # type: ignore
+        # last_year_rbf_flow(max_rows_train=1000, full_submission=True)  # type: ignore
         # last_year_rbf_flow(max_rows_train=5000)  # type: ignore

@@ -1,3 +1,7 @@
+# 11/4
+
+Need to address this cv/lb problem. A few ideas: 1) almost certainly need to do random sampling now 2) Probably need to do grouped k-fold by day 3) Should also just do a quick double check to make sure there's not some other bug, as it is true CV so far is usually really high.
+
 # 11/3
 
 Did some more memory profiling. Using `SequentialTaskRunner` decreased peak memory by 22%. I was still seeing some large objects from `.load_data()` in the peak report. I could be reading the graph incorrectly, but seems almost like large objects aren't being de-allocated properly, so doing some manual `del df; gc.collect()` to see if that helps. Before (and this didn't help) I had been doing just `del` without `gc.collect()` but who knows (I think the technique is more for notebooks). Aaand yes, the python gc DOES work by itself (no change at all in peak mem usage). 
@@ -11,6 +15,10 @@ I'm gonna dive into Dask more deeply, because out of core memory stuff is suppos
 I'm being reminded that I've not really done a proper learning curve yet. I so have SOME data from past submission where, (with 128 input/output dims) I got a slightly better score going from 25k row (.801 -> .802). Gonna do a submission with what I CAN do (50k rows multi/cite) just to see how things work.
 
 Another way to solve these memory issues is to loop over each output and train a model for each. Sklearn seems to be poor at optimizing this. 
+
+Saturn cloud was having issues submitting to kaggle, so had to download, THEN submit. Aaaand, terrible score. Unsure how I'm getting such a good CV score though, very high on multi and cite. Is something wrong with my pipeline? Could be that I've not set up random sampling and that's biasing things.
+
+Seems like there's a bug in my cv locally, as correlation is not so high with lb score.
 
 #11/2
 
