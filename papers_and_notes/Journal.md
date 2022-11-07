@@ -1,8 +1,12 @@
 # 11/7
 
+Ok the final week. Goal is to hit .812 by any mean necessary. Biological means get a plus. NN means get a plus. 
+- Need to join metadata and do randomized sampling. 
+- Still need to look into these really high CVs a bit more. 
+
 # 11/4
 
-Need to address this cv/lb problem. A few ideas: 1) almost certainly need to do random sampling now 2) Probably need to do grouped k-fold by day 3) Should also just do a quick double check to make sure there's not some other bug, as it is true CV so far is usually really high. Did some checking, CV seems pretty legit as is.
+Need to address this cv/lb problem. A few ideas: 1) almost certainly need to do random sampling now 2) Probably need to do grouped k-fold by day 3) Should also just do a quick double check to make sure there's not some other bug, as it is true CV so far is usually really high. Did some checking, CV seems pretty legit as is. Did a bunch of test varying hyperparams to make sure they behave as expected.
 
 
 

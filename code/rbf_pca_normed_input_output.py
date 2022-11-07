@@ -33,6 +33,7 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 def last_year_rbf_flow(
     # default params used for testing
     max_rows_train: int = 1_000,
+    offset: int = 0,
     full_submission: bool = False,
     technology: TechnologyRepository = utils.cite,
     inputs_pca_dims: int = 2,
@@ -40,6 +41,7 @@ def last_year_rbf_flow(
     k_folds: int = 2,
     scale: float = 10,  # RBF scale param. Higher means more model complexity
     alpha: float = 0.2,  # Regularization param. More is more regularization.
+    sparse: bool = True,
 ):
     with mlflow.start_run():
         # log all inputs into mlflow
@@ -52,18 +54,15 @@ def last_year_rbf_flow(
             technology=technology,
             max_rows_train=max_rows_train,
             full_submission=full_submission,
-            sparse=True,
+            offset=offset,
+            sparse=sparse,
         )
-        train_inputs, train_targets, test_inputs = (
-            data.train_inputs,
-            data.train_targets,
-            data.test_inputs,
-        )
+
         pca_train_inputs, pca_test_inputs, _ = pca_inputs(  # type: ignore
-            train_inputs, test_inputs, inputs_pca_dims
+            data.train_inputs.values, data.test_inputs.values, inputs_pca_dims
         )
         pca_train_targets, pca_model_targets = truncated_pca.submit(  # type: ignore
-            train_targets,
+            data.train_targets.values,
             targets_pca_dims,
             return_model=True,
         ).result()
@@ -100,8 +99,6 @@ def last_year_rbf_flow(
 
 
 if __name__ == "__main__":
-    last_year_rbf_flow(alpha=1000000000, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
-    last_year_rbf_flow(alpha=100, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
-    last_year_rbf_flow(alpha=10, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
-    last_year_rbf_flow(alpha=1, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
-    last_year_rbf_flow(alpha=0.000001, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
+    for i in range(10):
+        offset = i * 7_000
+        last_year_rbf_flow(alpha=10, max_rows_train=1000, inputs_pca_dims=5, offset=offset)  # type: ignore
