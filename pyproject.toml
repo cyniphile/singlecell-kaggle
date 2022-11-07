@@ -1,31 +1,36 @@
 [tool.poetry]
 name = "singlecell-kaggle"
 version = "0.1.0"
-description = ""
+description = "Analysis of single-cell multi-omic data"
 authors = ["Luke Schiefelbein <luke.schiefelbein@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
-h5py = "^3.7.0"
-natsort = "^8.2.0"
 numpy = "^1.23.4"
-packaging = "^21.3"
-pandas = "^1.5.0"
-scipy = "^1.9.2"
+pyarrow = "^10.0.0"
+pandas = "^1.5.1"
+scipy = "^1.9.3"
 sklearn = "^0.0"
 tables = "^3.7.0"
-ipykernel = "^6.16.0"
-pyarrow = "^9.0.0"
+ipykernel = "^6.17.0"
 kaggle = "^1.5.12"
-prefect = "^2.6.5"
 mlflow = "^1.30.0"
 hdf5plugin = "^3.3.1"
+packaging = "^21.3"
+h5py = "^3.7.0"
+bokeh = "2.4.3"
+prefect = "^2.6.6"
+prefect-dask = "^0.2.1"
+seaborn = "^0.12.1"
+plotext = "^5.2.8"
 
 [tool.poetry.dev-dependencies]
-pandas-stubs = "^1.5.0"
+ipdb = "^0.13.9"
+memray = "^1.4.0"
 mypy = "^0.982"
 black = "^22.10.0"
 pip-tools = "^6.9.0"
+pandas-stubs = "^1.5.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

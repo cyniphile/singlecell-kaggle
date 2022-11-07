@@ -2,7 +2,6 @@ import utils
 import os
 from typing import List
 import inspect
-import argparse
 from utils import (
     TechnologyRepository,
     fit_and_score_pca_targets,
@@ -20,24 +19,21 @@ import mlflow  # type: ignore
 from sklearn.gaussian_process.kernels import RBF  # type: ignore
 from sklearn.kernel_ridge import KernelRidge  # type: ignore
 
-# from prefect_dask.task_runners import DaskTaskRunner  # type: ignore
 
-# By default, Prefect makes a best effort to compute a
-# table hash of the .py file in which the flow is defined to
-# automatically detect when your code changes.
 # TODO: refactor to not be a decorator, instead just run as a subflow in the
 # `full_submission` branch.
-@run_or_get_cache
+# @run_or_get_cache
 @flow(
     name="RBF with Input and Target PCA",
     description="Based on last year's winner of RNA->Prot",
+    # TODO: could be a way to turn this into a cache result
     # persist_result=True,
     # result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
-    # task_runner=DaskTaskRunner(),
 )
 def last_year_rbf_flow(
     # default params used for testing
     max_rows_train: int = 1_000,
+    offset: int = 0,
     full_submission: bool = False,
     technology: TechnologyRepository = utils.cite,
     inputs_pca_dims: int = 2,
@@ -45,6 +41,7 @@ def last_year_rbf_flow(
     k_folds: int = 2,
     scale: float = 10,  # RBF scale param. Higher means more model complexity
     alpha: float = 0.2,  # Regularization param. More is more regularization.
+    sparse: bool = True,
 ):
     with mlflow.start_run():
         # log all inputs into mlflow
@@ -57,18 +54,15 @@ def last_year_rbf_flow(
             technology=technology,
             max_rows_train=max_rows_train,
             full_submission=full_submission,
-            sparse=True,
+            offset=offset,
+            sparse=sparse,
         )
-        train_inputs, train_targets, test_inputs = (
-            data.train_inputs,
-            data.train_targets,
-            data.test_inputs,
-        )
+
         pca_train_inputs, pca_test_inputs, _ = pca_inputs(  # type: ignore
-            train_inputs, test_inputs, inputs_pca_dims
+            data.train_inputs.values, data.test_inputs.values, inputs_pca_dims
         )
         pca_train_targets, pca_model_targets = truncated_pca.submit(  # type: ignore
-            train_targets,
+            data.train_targets.values,
             targets_pca_dims,
             return_model=True,
         ).result()
@@ -82,6 +76,10 @@ def last_year_rbf_flow(
             logging.info("Fit full model on all training data")
             krr.fit(norm_pca_train_inputs, pca_train_targets)  # type: ignore
             logging.info("Predict on full submission inputs")
+            Y_hat_train = krr.predict(norm_pca_train_inputs) @ pca_model_targets.components_  # type: ignore
+            Y_train = pca_train_targets @ pca_model_targets.components_  # type: ignore
+            train_score = utils.correlation_score(Y_train, Y_hat_train)
+            mlflow.log_metric("training_score_correlation", train_score)
             Y_hat = krr.predict(test_norm) @ pca_model_targets.components_  # type: ignore
             formatted_submission = utils.format_submission.submit(
                 Y_hat, technology
@@ -101,16 +99,6 @@ def last_year_rbf_flow(
 
 
 if __name__ == "__main__":
-    # Run script as a test
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--full_submission", action=argparse.BooleanOptionalAction)
-    args = parser.parse_args()
-    # Should be a 1:1 mapping of args to function params
-    args_dict = vars(args)
-    if args.full_submission:
-        last_year_rbf_flow(**args_dict)  # type: ignore
-    else:
-        # run with default test params, and caching disabled
-        last_year_rbf_flow()  # type: ignore
-        last_year_rbf_flow(ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
-        last_year_rbf_flow(ignore_cache=True, skip_caching=True)  # type: ignore
+    for i in range(10):
+        offset = i * 7_000
+        last_year_rbf_flow(alpha=10, max_rows_train=1000, inputs_pca_dims=5, offset=offset)  # type: ignore

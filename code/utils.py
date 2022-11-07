@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import functools
 import sys
 import dataclasses, json
@@ -6,22 +6,18 @@ import importlib.util
 import logging
 import hashlib
 import inspect
-import datetime
 import json
 import os
 import pathlib
 import typing
 import mlflow  # type: ignore
-
 import numpy as np
 import scipy as sp  # type: ignore
-
 import pandas as pd
 from dataclasses import dataclass
 from prefect import flow, task, get_run_logger
 from prefect.tasks import task_input_hash
 from typing import Optional
-
 from sklearn.model_selection import KFold  # type: ignore
 from sklearn.decomposition import TruncatedSVD  # type: ignore
 
@@ -54,10 +50,15 @@ SPARSE_DATA_DIR = project_root / "data" / "sparse"
 # Predictions Output data dir.
 OUTPUT_DIR = project_root / "data" / "submissions"
 
+METADATA_PATH = SPARSE_DATA_DIR / "metadata.parquet"
+
 
 for path in [DATA_DIR, SPARSE_DATA_DIR, DATA_DIR]:
     if not path.is_dir():
         raise ValueError(f"directory not found: {path}")
+
+SPLIT_TYPES = ["train", "test"]
+DATA_TYPES = ["inputs", "targets"]
 
 
 @dataclass
@@ -65,27 +66,16 @@ class TechnologyRepository:
     name: str
 
     def __post_init__(self):
-        self.train_inputs_path: str = f"{DATA_DIR}/train_{self.name}_inputs.h5"
-        self.train_targets_path: str = f"{DATA_DIR}/train_{self.name}_targets.h5"
-        self.test_inputs_path: str = f"{DATA_DIR}/test_{self.name}_inputs.h5"
-        self.train_inputs_sparse_values_path: str = (
-            f"{SPARSE_DATA_DIR}/train_{self.name}_inputs_values.sparse.npz"
-        )
-        self.train_targets_sparse_values_path: str = (
-            f"{SPARSE_DATA_DIR}/train_{self.name}_targets_values.sparse.npz"
-        )
-        self.test_inputs_sparse_values_path: str = (
-            f"{SPARSE_DATA_DIR}/test_{self.name}_inputs_values.sparse.npz"
-        )
-        self.train_inputs_sparse_idxcol_path: str = (
-            f"{SPARSE_DATA_DIR}/train_{self.name}_inputs_idxcol.npz"
-        )
-        self.train_targets_sparse_idxcol_path: str = (
-            f"{SPARSE_DATA_DIR}/train_{self.name}_targets_idxcol.npz"
-        )
-        self.test_inputs_sparse_idxcol_path: str = (
-            f"{SPARSE_DATA_DIR}/test_{self.name}_inputs_idxcol.npz"
-        )
+        for split in SPLIT_TYPES:
+            for data_type in DATA_TYPES:
+                _full: str = f"{DATA_DIR}/{split}_{self.name}_{data_type}.h5"
+                _sparse: str = f"{SPARSE_DATA_DIR}/{split}_{self.name}_{data_type}_values.sparse.npz"
+                _sparse_idx: str = (
+                    f"{SPARSE_DATA_DIR}/{split}_{self.name}_{data_type}_idxcol.npz"
+                )
+                setattr(self, f"{split}_{data_type}_path", _full)
+                setattr(self, f"{split}_{data_type}_sparse_values_path", _sparse)
+                setattr(self, f"{split}_{data_type}_sparse_idxcol_path", _sparse_idx)
 
 
 multi = TechnologyRepository("multi")
@@ -134,6 +124,19 @@ def row_wise_std_scaler(M):
 
 
 @dataclass
+class DensePathDescription:
+    path: str
+
+
+@dataclass
+class SparsePathDescription(DensePathDescription):
+    idx_path: str
+
+
+PathDescription = DensePathDescription | SparsePathDescription
+
+
+@dataclass
 class Score:
     score: float
 
@@ -144,14 +147,28 @@ class ScoreSummary:
 
 
 @dataclass
+class DenseDataset:
+    values: pd.DataFrame
+
+
+@dataclass
+class SparseDataset(DenseDataset):
+    index: np.lib.npyio.NpzFile  # type: ignore
+
+
+Dataset = SparseDataset | DenseDataset
+
+
+@dataclass
 class Datasets:
     """
     Holds three basic datasets necessary for an experiment
     """
 
-    train_inputs: typing.Any
-    train_targets: typing.Any
-    test_inputs: typing.Any
+    _: dataclasses.KW_ONLY
+    train_inputs: Dataset
+    train_targets: Dataset
+    test_inputs: Dataset
 
 
 # Prefect pipeline functions
@@ -159,75 +176,122 @@ class Datasets:
 
 def load_data(
     *,
-    path: str,
-    path_sparse: str,
-    max_rows_train: Optional[int] = None,
-    sparse: bool = False,
-):
-    if sparse:
-        return sp.sparse.load_npz(path_sparse)[:max_rows_train]
-    else:
-        return pd.read_hdf(path, start=0, stop=max_rows_train)
+    path_description: PathDescription,
+    offset: int = 0,
+    max_rows: Optional[int] = None,
+) -> Dataset:
+    match path_description:
+        case SparsePathDescription(path, idx_path):
+            sparse_data = sp.sparse.load_npz(path)[offset : offset + max_rows]
+            sparse_index = np.load(idx_path, allow_pickle=True)
+            return SparseDataset(values=sparse_data, index=sparse_index)
+        case DensePathDescription(path):
+            df: pd.DataFrame = pd.read_hdf(path, start=offset, stop=offset + max_rows)  # type: ignore
+            return DenseDataset(values=df)
 
 
-@task
-def load_train_inputs(*, technology: TechnologyRepository, **kwargs):
-    return load_data(
-        path=technology.train_inputs_path,
-        path_sparse=technology.train_inputs_sparse_values_path,
-        **kwargs,
-    )
+class Loaders:
+    pass
 
 
-@task
-def load_train_targets(*, technology: TechnologyRepository, **kwargs):
-    return load_data(
-        path=technology.train_targets_path,
-        path_sparse=technology.train_targets_sparse_values_path,
-        **kwargs,
-    )
+def make_loader(split_type, data_type):
+    @task(name=f"load_{split_type}_{data_type}")
+    def _loader(
+        technology: TechnologyRepository,
+        sparse: bool = False,
+        max_rows: Optional[int] = None,
+        offset: int = 0,
+    ):
+        if sparse:
+            idx_path = getattr(
+                technology, f"{split_type}_{data_type}_sparse_idxcol_path"
+            )
+            values_path = getattr(
+                technology, f"{split_type}_{data_type}_sparse_values_path"
+            )
+            path_description = SparsePathDescription(values_path, idx_path)
+            return load_data(
+                path_description=path_description, max_rows=max_rows, offset=offset
+            )
+        else:
+            values_path = getattr(technology, f"{split_type}_{data_type}_path")
+            return load_data(
+                path_description=DensePathDescription(values_path),
+                max_rows=max_rows,
+            )
+
+    return _loader
 
 
-@task
-def load_test_inputs(*, technology: TechnologyRepository, **kwargs):
-    return load_data(
-        path=technology.test_inputs_path,
-        path_sparse=technology.test_inputs_sparse_values_path,
-        **kwargs,
-    )
+for split in SPLIT_TYPES:
+    for data in DATA_TYPES:
+        _loader = make_loader(split, data)
+        func_name = f"load_{split}_{data}"
+        setattr(Loaders, func_name, _loader)
 
 
 @flow
 def load_all_data(
     technology: TechnologyRepository,
-    max_rows_train: int,
-    full_submission: bool,
-    sparse: bool,
+    max_rows_train: Optional[int] = None,
+    offset: int = 0,
+    full_submission: bool = False,
+    sparse: bool = False,
 ):
-    # train_inputs = load_test_inputs.submit(
-    train_inputs = load_train_inputs.submit(
+    train_inputs = Loaders.load_train_inputs.submit(  # type: ignore
         technology=technology,
-        max_rows_train=max_rows_train,
+        max_rows=max_rows_train,
+        offset=offset,
         sparse=sparse,
     ).result()
     # Targets need to be in dense format for sklearn training :-(
-    train_targets = load_train_targets.submit(
+    train_targets = Loaders.load_train_targets.submit(  # type: ignore
         technology=technology,
-        max_rows_train=max_rows_train,
+        offset=offset,
+        max_rows=max_rows_train,
     ).result()
     # If submitting to kaggle need to load full test_inputs to generate
     # a complete and valid submission
     if full_submission:
-        test_inputs = load_test_inputs.submit(
+        test_inputs = loaders.load_test_inputs.submit(  # type: ignore
             technology=technology, sparse=sparse
         ).result()
     else:
-        test_inputs = load_test_inputs.submit(
+        test_inputs = Loaders.load_test_inputs.submit(  # type: ignore
             technology=technology,
-            max_rows_train=max_rows_train,
+            max_rows=max_rows_train,
+            offset=offset,
             sparse=sparse,
         ).result()
-    return Datasets(train_inputs, train_targets, test_inputs)
+    return Datasets(
+        train_inputs=train_inputs, train_targets=train_targets, test_inputs=test_inputs
+    )
+
+
+@task
+def load_metadata():
+    return pd.read_parquet(METADATA_PATH).set_index("cell_id")
+
+
+@flow
+def merge_with_metadata(*, train_inputs, test_inputs):
+    metadata = load_metadata()
+    match train_inputs, test_inputs:
+        case (
+            SparseDataset(values=train_inputs_values, index=train_inputs_index),
+            SparseDataset(values=test_inputs_values, index=test_inputs_index),
+        ):
+            pass
+        case (DenseDataset(train_inputs), DenseDataset(test_inputs)):
+            merged_train = pd.merge(
+                train_inputs, metadata, left_index=True, right_index=True
+            )
+            assert merged_train.shape[0] == train_inputs.shape[0]
+            merged_test = pd.merge(
+                test_inputs, metadata, left_index=True, right_index=True
+            )
+            assert merged_test.shape[0] == test_inputs.shape[0]
+            return merged_train, merged_test
 
 
 @task(cache_key_fn=task_input_hash)
@@ -289,13 +353,20 @@ def fit_and_score_pca_targets(
     """
     logging = get_run_logger()
     model.fit(train_inputs, pca_train_targets)
+
+    Y_hat_train = model.predict(train_inputs) @ pca_model_targets.components_
+    Y_train = pca_train_targets @ pca_model_targets.components_
+    train_score = correlation_score(Y_train, Y_hat_train)
+    mlflow.log_metric("Train Score", train_score)
+    logging.info(f"Train Score: {train_score}")
+
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
     Y = pca_test_targets @ pca_model_targets.components_
-    score = correlation_score(Y, Y_hat)
-    mlflow.log_metric("Score", score)
-    logging.info(f"Score: {score}")
-    return Score(score=score)
+    test_score = correlation_score(Y, Y_hat)
+    mlflow.log_metric("Test Score", test_score)
+    logging.info(f"Test Score: {test_score}")
+    return Score(score=test_score)
 
 
 @flow
@@ -340,11 +411,11 @@ def format_submission(Y_pred_raw, technology: TechnologyRepository):
     logging = get_run_logger()
     logging.info("Loading indices...")
     test_index = np.load(
-        technology.test_inputs_sparse_idxcol_path,
+        technology.test_inputs_sparse_idxcol_path,  # type: ignore
         allow_pickle=True,
     )["index"]
     y_columns = np.load(
-        technology.train_targets_sparse_idxcol_path,
+        technology.train_targets_sparse_idxcol_path,  # type: ignore
         allow_pickle=True,
     )["columns"]
 
@@ -392,8 +463,6 @@ def _merge_submission(
     """
     merge predictions for two technologies to make a full submission for both
     """
-
-    # logging = get_run_logger()
     # drop multi-index to align with other submission
     reindexed_submission_this = this_technology_predictions.reset_index(drop=True)
     # Merge with separate predictions for other technology
@@ -412,7 +481,6 @@ def _merge_submission(
 
 # @task
 def _submit_to_kaggle(merged_submission, submission_message: str):
-    # logging = get_run_logger()
     # write full predictions to csv
     file_safe_message = "".join(x for x in submission_message if x.isalnum())
     submission_file_name = f"{str(OUTPUT_DIR)}/{file_safe_message}.csv"
@@ -460,6 +528,7 @@ def run_or_get_cache(flow):
     run and save results in arrow/feather file; if so return saved results.
     """
 
+    # TODO: not working if flow was run with "full_submission=True" before
     logging = get_run_logger()
 
     @functools.wraps(flow)
