@@ -1,10 +1,16 @@
+# 11/7
+
 # 11/4
 
-Need to address this cv/lb problem. A few ideas: 1) almost certainly need to do random sampling now 2) Probably need to do grouped k-fold by day 3) Should also just do a quick double check to make sure there's not some other bug, as it is true CV so far is usually really high.
+Need to address this cv/lb problem. A few ideas: 1) almost certainly need to do random sampling now 2) Probably need to do grouped k-fold by day 3) Should also just do a quick double check to make sure there's not some other bug, as it is true CV so far is usually really high. Did some checking, CV seems pretty legit as is.
+
+
 
 # 11/3
 
 Did some more memory profiling. Using `SequentialTaskRunner` decreased peak memory by 22%. I was still seeing some large objects from `.load_data()` in the peak report. I could be reading the graph incorrectly, but seems almost like large objects aren't being de-allocated properly, so doing some manual `del df; gc.collect()` to see if that helps. Before (and this didn't help) I had been doing just `del` without `gc.collect()` but who knows (I think the technique is more for notebooks). Aaand yes, the python gc DOES work by itself (no change at all in peak mem usage). 
+
+
 
 That said I think I need more reduction of peak mem.
 

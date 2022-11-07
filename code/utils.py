@@ -277,7 +277,6 @@ def fit_and_score_pca_targets(
     pca_test_targets,
     model,
     pca_model_targets: TruncatedSVD,
-    # pca_model_inputs: TruncatedSVD,
 ) -> Score:
     """
     performs model fit and score where model is predicting a reduced
@@ -285,18 +284,21 @@ def fit_and_score_pca_targets(
     """
     logging = get_run_logger()
     model.fit(train_inputs, pca_train_targets)
+
+    Y_hat_train = model.predict(train_inputs) @ pca_model_targets.components_
+    Y_train = pca_train_targets @ pca_model_targets.components_
+    train_score = correlation_score(Y_train, Y_hat_train)
+    mlflow.log_metric("Train Score", train_score)
+    logging.info(f"Train Score: {train_score}")
+
     # TODO: review pca de-reduction
     Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
-    # TODO: eventually uncomment and rework to have proper training score
-    # but don't want to add extra memory overhead rn and r2 isn't horrible
-    # Y_hat_train = model.predict(train_inputs) @ pca_model_inputs.components_
     Y = pca_test_targets @ pca_model_targets.components_
-    score = correlation_score(Y, Y_hat)
-    mlflow.log_metric("Test Score", score)
-    logging.info(f"Test Score: {score}")
-    mlflow.log_metric("Test Score", score)
-    logging.info(f"Test Score: {score}")
-    return Score(score=score)
+    test_score = correlation_score(Y, Y_hat)
+    mlflow.log_metric("Test Score", test_score)
+    logging.info(f"Test Score: {test_score}")
+    import ipdb; ipdb.set_trace()  # fmt: skip
+    return Score(score=test_score)
 
 
 @flow
@@ -549,3 +551,6 @@ def create_submission_from_mlflow_experiments(cite_mlflow_run_id, multi_mlflow_r
     m = _create_submission_based_on_experiment(multi_mlflow_run_id, multi)
     s = SubmissionExperiments(cite_mlflow_run_id, multi_mlflow_run_id)
     return _merge_and_submit(c, m, s)
+
+
+    

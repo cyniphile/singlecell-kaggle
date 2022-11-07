@@ -2,7 +2,6 @@ import utils
 import os
 from typing import List
 import inspect
-import argparse
 from utils import (
     TechnologyRepository,
     fit_and_score_pca_targets,
@@ -101,18 +100,8 @@ def last_year_rbf_flow(
 
 
 if __name__ == "__main__":
-    # Run script as a test
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--full_submission", action=argparse.BooleanOptionalAction)
-    args = parser.parse_args()
-    # Should be a 1:1 mapping of args to function params
-    args_dict = vars(args)
-    if args.full_submission:
-        last_year_rbf_flow(**args_dict)  # type: ignore
-    else:
-        # run with default test params, and caching disabled
-        last_year_rbf_flow()  # type: ignore
-        # last_year_rbf_flow(max_rows_train=5000, ignore_cache=True, skip_caching=True, technology=utils.multi)  # type: ignore
-        # last_year_rbf_flow(max_rows_train=5000, ignore_cache=True, skip_caching=True)  # type: ignore
-        # last_year_rbf_flow(max_rows_train=1000, full_submission=True)  # type: ignore
-        # last_year_rbf_flow(max_rows_train=5000)  # type: ignore
+    last_year_rbf_flow(alpha=1000000000, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
+    last_year_rbf_flow(alpha=100, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
+    last_year_rbf_flow(alpha=10, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
+    last_year_rbf_flow(alpha=1, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore
+    last_year_rbf_flow(alpha=0.000001, max_rows_train=1000, inputs_pca_dims=5)  # type: ignore

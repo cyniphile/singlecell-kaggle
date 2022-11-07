@@ -21,6 +21,8 @@ h5py = "^3.7.0"
 bokeh = "2.4.3"
 prefect = "^2.6.6"
 prefect-dask = "^0.2.1"
+seaborn = "^0.12.1"
+plotext = "^5.2.8"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.9"
