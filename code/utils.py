@@ -9,7 +9,6 @@ import inspect
 import json
 import os
 import pathlib
-import typing
 import mlflow  # type: ignore
 import numpy as np
 import scipy as sp  # type: ignore
@@ -100,7 +99,7 @@ def correlation_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return corr_sum / len(y_true)
 
 
-def test_valid_submission(submission: pd.DataFrame):
+def test_valid_submission(submission: pd.DataFrame) -> None:
     """
     Checks that a submission dataframe is properly formatted for submission
     to Kaggle
@@ -177,17 +176,52 @@ class Datasets:
 def load_data(
     *,
     path_description: PathDescription,
-    offset: int = 0,
+    offset: Optional[int] = None,
     max_rows: Optional[int] = None,
+    random: bool = True,
 ) -> Dataset:
-    match path_description:
-        case SparsePathDescription(path, idx_path):
-            sparse_data = sp.sparse.load_npz(path)[offset : offset + max_rows]
-            sparse_index = np.load(idx_path, allow_pickle=True)
-            return SparseDataset(values=sparse_data, index=sparse_index)
-        case DensePathDescription(path):
-            df: pd.DataFrame = pd.read_hdf(path, start=offset, stop=offset + max_rows)  # type: ignore
-            return DenseDataset(values=df)
+    match (max_rows, offset, random):
+        case (None, _, _):
+            match path_description:
+                case SparsePathDescription(path, idx_path):
+                    sparse_data = sp.sparse.load_npz(path)  # type: ignore
+                    sparse_index = np.load(idx_path, allow_pickle=True)
+                    return SparseDataset(values=sparse_data, index=sparse_index)
+                case DensePathDescription(path):
+                    df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
+                    return DenseDataset(values=df)  # type: ignore
+        case (int(), None, True):
+            # make np return same random string each time
+            np.random.seed(0)
+            match path_description:
+                case SparsePathDescription(path, idx_path):
+                    sparse_data = sp.sparse.load_npz(path)  # type: ignore
+                    random_indices = np.random.uniform(
+                        0,
+                        sparse_data.shape[0],
+                        min(max_rows, sparse_data.shape[0]),
+                    )
+                    filtered_sparse_data = sparse_data[random_indices]
+                    sparse_index = np.load(idx_path, allow_pickle=True)
+                    return SparseDataset(
+                        values=filtered_sparse_data, index=sparse_index
+                    )
+                case DensePathDescription(path):
+                    df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
+                    random_indices = np.random.uniform(0, df.shape[0], max_rows)  # type: ignore
+                    random_subset = df.iloc[random_indices]  # type: ignore
+                    return DenseDataset(values=random_subset)  # type: ignore
+        case (int(), int(), False):
+            match path_description:
+                case SparsePathDescription(path, idx_path):
+                    sparse_data = sp.sparse.load_npz(path)[offset : offset + max_rows]  # type: ignore
+                    sparse_index = np.load(idx_path, allow_pickle=True)
+                    return SparseDataset(values=sparse_data, index=sparse_index)
+                case DensePathDescription(path):
+                    df: pd.DataFrame = pd.read_hdf(path, start=offset, stop=offset + max_rows)  # type: ignore
+                    return DenseDataset(values=df)
+        case _:
+            raise RuntimeError("Invalid arguments")
 
 
 class Loaders:
@@ -234,7 +268,7 @@ for split in SPLIT_TYPES:
 def load_all_data(
     technology: TechnologyRepository,
     max_rows_train: Optional[int] = None,
-    offset: int = 0,
+    offset: Optional[int] = 0,
     full_submission: bool = False,
     sparse: bool = False,
 ):
@@ -253,7 +287,7 @@ def load_all_data(
     # If submitting to kaggle need to load full test_inputs to generate
     # a complete and valid submission
     if full_submission:
-        test_inputs = loaders.load_test_inputs.submit(  # type: ignore
+        test_inputs = Loaders.load_test_inputs.submit(  # type: ignore
             technology=technology, sparse=sparse
         ).result()
     else:
@@ -295,23 +329,16 @@ def merge_with_metadata(*, train_inputs, test_inputs):
 
 
 @task(cache_key_fn=task_input_hash)
-def truncated_pca(
-    dataset, n_components, return_model: bool = False
-) -> Tuple[np.ndarray, Optional[TruncatedSVD]]:
+def truncated_pca(dataset, n_components) -> Tuple[np.ndarray, Optional[TruncatedSVD]]:
     pca = TruncatedSVD(n_components=n_components)
     # TODO: float16 might be better, saw something in the forum
     pca_features = pca.fit_transform(dataset).astype(np.float32)
-    if return_model:
-        # TODO: use dataclass here, but wasn't working with prefect
-        return pca_features, pca
-    else:
-        return pca_features, None
+    # TODO: use dataclass here, but wasn't working with prefect
+    return pca_features, pca
 
 
 @flow
-def pca_inputs(
-    train_inputs, test_inputs, n_components: int, return_model: bool = False
-):
+def pca_inputs(train_inputs, test_inputs, n_components: int):
     """
     Stack all input data (including testing inputs) and do PCA on
     everything. Useful since this is not a kernel competition and
@@ -320,13 +347,12 @@ def pca_inputs(
     inputs = sp.sparse.vstack([train_inputs, test_inputs])
     assert inputs.shape[0] == train_inputs.shape[0] + test_inputs.shape[0]
     reduced_values, pca_model = truncated_pca.submit(  # type: ignore
-        inputs,
-        n_components,
-        return_model,
+        inputs, n_components
     ).result()
     # First len(input_train) rows are input_train
     # Lots of `type: ignore` due to strange typing error from
     # prefect on multiple returns
+    # TODO: ensure stacking is preserved, not mixing train test somehow?
     pca_train_inputs = reduced_values[: train_inputs.shape[0]]  # type: ignore
     # Last len(input_test) rows are input_test
     pca_test_inputs = reduced_values[train_inputs.shape[0] :]  # type: ignore
@@ -335,38 +361,10 @@ def pca_inputs(
         pca_train_inputs.shape[0] + pca_test_inputs.shape[0]
     ) == reduced_values.shape[0]  # type: ignore
     # fmt: on
+    assert pca_train_inputs.shape[0] == train_inputs.shape[0]
+    assert pca_test_inputs.shape[0] == test_inputs.shape[0]
+
     return pca_train_inputs, pca_test_inputs, pca_model  # type: ignore
-
-
-@task
-def fit_and_score_pca_targets(
-    train_inputs: np.ndarray,
-    pca_train_targets,
-    test_inputs: np.ndarray,
-    pca_test_targets,
-    model,
-    pca_model_targets: TruncatedSVD,
-) -> Score:
-    """
-    performs model fit and score where model is predicting a reduced
-    pca vector that needs to be converted back to raw data space
-    """
-    logging = get_run_logger()
-    model.fit(train_inputs, pca_train_targets)
-
-    Y_hat_train = model.predict(train_inputs) @ pca_model_targets.components_
-    Y_train = pca_train_targets @ pca_model_targets.components_
-    train_score = correlation_score(Y_train, Y_hat_train)
-    mlflow.log_metric("Train Score", train_score)
-    logging.info(f"Train Score: {train_score}")
-
-    # TODO: review pca de-reduction
-    Y_hat = model.predict(test_inputs) @ pca_model_targets.components_
-    Y = pca_test_targets @ pca_model_targets.components_
-    test_score = correlation_score(Y, Y_hat)
-    mlflow.log_metric("Test Score", test_score)
-    logging.info(f"Test Score: {test_score}")
-    return Score(score=test_score)
 
 
 @flow
@@ -380,7 +378,7 @@ def k_fold_validation(
     **model_kwargs,
 ):
     logging = get_run_logger()
-    kf = KFold(n_splits=k)
+    kf = KFold(n_splits=k, shuffle=True, random_state=0)
     scores = []
     for fold_index, (train_indices, test_indices) in enumerate(kf.split(train_inputs)):
         fold_train_inputs = train_inputs[train_indices]
@@ -388,14 +386,14 @@ def k_fold_validation(
         fold_test_inputs = train_inputs[test_indices]
         fold_test_targets = train_targets[test_indices]
         logging.info(f"Fitting fold {fold_index}...")
-        score = fit_and_score_task.submit(
-            fold_train_inputs,
-            fold_train_targets,
-            fold_test_inputs,
-            fold_test_targets,
+        score = fit_and_score_task(
+            train_inputs=fold_train_inputs,
+            train_targets=fold_train_targets,
+            test_inputs=fold_test_inputs,
+            test_targets=fold_test_targets,
             model=model,
             **model_kwargs,
-        ).result()
+        )
         logging.info(f"Score {score} for fold {fold_index}")
         scores.append(score)
     return scores
@@ -619,3 +617,59 @@ def create_submission_from_mlflow_experiments(cite_mlflow_run_id, multi_mlflow_r
     m = _create_submission_based_on_experiment(multi_mlflow_run_id, multi)
     s = SubmissionExperiments(cite_mlflow_run_id, multi_mlflow_run_id)
     return _merge_and_submit(c, m, s)
+
+
+@flow
+def fit_and_score_pca_input_output(
+    *,
+    train_inputs,
+    train_targets,
+    test_inputs,
+    test_targets=None,
+    inputs_pca_dims,
+    targets_pca_dims,
+    model,
+    merge_inputs_for_pca=True,
+) -> Score | np.ndarray:
+    """
+    performs model fit and score where model is predicting a reduced
+    pca vector that needs to be converted back to raw data space.
+    If no test_targets are passed, return the predictions instead of the score
+    """
+    logging = get_run_logger()
+    if merge_inputs_for_pca:
+        # Option to do pca on combined train & test inputs.
+        pca_train_inputs, pca_test_inputs, _ = pca_inputs(  # type: ignore
+            train_inputs, test_inputs, inputs_pca_dims
+        )
+    else:
+        pca_train_inputs, _ = truncated_pca.submit(  # type: ignore
+            train_inputs,
+            inputs_pca_dims,
+        ).result()
+        pca_test_inputs, _ = truncated_pca.submit(  # type: ignore
+            test_inputs,
+            inputs_pca_dims,
+        ).result()
+    norm_pca_train_inputs = row_wise_std_scaler(pca_train_inputs).astype(np.float32)  # type: ignore
+    norm_pca_test_inputs = row_wise_std_scaler(pca_test_inputs).astype(np.float32)  # type: ignore
+    pca_train_targets, pca_model_train_targets = truncated_pca.submit(  # type: ignore
+        train_targets,
+        targets_pca_dims,
+    ).result()
+    model.fit(norm_pca_train_inputs, pca_train_targets)
+    Y_hat_train = (
+        model.predict(norm_pca_train_inputs) @ pca_model_train_targets.components_  # type: ignore
+    )
+    train_score = correlation_score(train_targets, Y_hat_train)
+    mlflow.log_metric("Train Score", train_score)
+    logging.info(f"Train Score: {train_score}")
+    Y_hat = model.predict(norm_pca_test_inputs) @ pca_model_train_targets.components_  # type: ignore
+    if test_targets is not None:
+        # TODO: review pca de-reduction
+        test_score = correlation_score(test_targets, Y_hat)
+        mlflow.log_metric("Test Score", test_score)
+        logging.info(f"Test Score: {test_score}")
+        return Score(score=test_score)
+    else:
+        return Y_hat

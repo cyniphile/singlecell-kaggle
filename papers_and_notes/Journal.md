@@ -1,8 +1,29 @@
+# 11/10
+
+Doing testing to see if dimensionality reduction could be done more intelligently. One highly ranked competitor posted that he uses only the top n most abs(correlated) features. 
+
+# 11/9
+
+Need to understand why I'm getting such high cv scores. Seems like a bug.
+
+set up random sampling. Need to review reverse PCA, might be a problem. Also r2 looking really bad and makes more sense. 
+
+review pca
+
+Find the covariance matrix $ C = X^TX/n $, change its basis to its eigenbasis (e.g. diagnolize) to $V\LambdaV^T$. By spectral theorem and the fact the C is symmetric, we know V, the orthonormal eigenbasis, exists. Since the eigenvalues of the covariance matrix are the directions of maximum covariance, we can filter out the lesser ones by setting those $\lambda$s to zero and 
+
+Did a lot of review of linalg and PCA to better understand how I was mis-using it so far (I think the main source of CV not correlated with LB). Making me wonder if a smarter dimensionality reduction scheme could work better, as this is a key challange.
+
+These resources were good:
+https://arxiv.org/pdf/1404.1100.pdf
+https://stats.stackexchange.com/questions/134282/relationship-between-svd-and-pca-how-to-use-svd-to-perform-pca?noredirect=1&lq=1
+https://www.youtube.com/watch?v=PFDu9oVAE-g&list=PLOzwfV5L9DFe_CSLn8m2vcADqvdL8TX-d&index=15&ab_channel=3Blue1Brown
+
 # 11/7
 
-Ok the final week. Goal is to hit .812 by any mean necessary. Biological means get a plus. NN means get a plus. 
+Ok the final week. Goal is to hit .812 by any means necessary. Biological means get a plus. NN means get a plus. 
 - Need to join metadata and do randomized sampling. 
-- Still need to look into these really high CVs a bit more. 
+- Still need to look into these really high CVs a bit more. did some work to 
 
 # 11/4
 
