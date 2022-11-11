@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import functools
 import sys
 import dataclasses, json
@@ -132,7 +132,7 @@ class SparsePathDescription(DensePathDescription):
     idx_path: str
 
 
-PathDescription = DensePathDescription | SparsePathDescription
+PathDescription = Union[DensePathDescription, SparsePathDescription]
 
 
 @dataclass
@@ -155,7 +155,7 @@ class SparseDataset(DenseDataset):
     index: np.lib.npyio.NpzFile  # type: ignore
 
 
-Dataset = SparseDataset | DenseDataset
+Dataset = Union[SparseDataset, DenseDataset]
 
 
 @dataclass
@@ -616,7 +616,7 @@ def fit_and_score_pca_input_output(
     targets_pca_dims,
     model,
     merge_inputs_for_pca=True,
-) -> Score | np.ndarray:
+):
     """
     performs model fit and score where model is predicting a reduced
     pca vector that needs to be converted back to raw data space.
