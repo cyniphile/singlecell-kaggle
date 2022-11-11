@@ -177,22 +177,24 @@ def load_data(
     *,
     path_description: PathDescription,
     max_rows: Optional[int] = None,
-) -> Dataset:   # type: ignore 
+) -> Dataset:  # type: ignore
     path = path_description.path
     if max_rows is None:
-            if type(path_description) == SparsePathDescription:
-                idx_path = path_description.idx_path  # type: ignore 
-                sparse_data = sp.sparse.load_npz(path)  # type: ignore
-                sparse_index = np.load(idx_path, allow_pickle=True)
-                return SparseDataset(values=sparse_data, index=sparse_index)
-            if type(path_description) == DensePathDescription
-                df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
-                return DenseDataset(values=df)  # type: ignore
+        if type(path_description) == SparsePathDescription:
+            idx_path = path_description.idx_path  # type: ignore
+            sparse_data = sp.sparse.load_npz(path)  # type: ignore
+            sparse_index = np.load(idx_path, allow_pickle=True)
+            return SparseDataset(values=sparse_data, index=sparse_index)
+        if type(path_description) == DensePathDescription:
+            df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
+            return DenseDataset(values=df)  # type: ignore
+        else:
+            raise RuntimeError()
     else:
         # make np return same random string each time
         np.random.seed(0)
         if type(path_description) == SparsePathDescription:
-            idx_path = path_description.idx_path  # type: ignore 
+            idx_path = path_description.idx_path  # type: ignore
             sparse_data = sp.sparse.load_npz(path)  # type: ignore
             random_indices = np.random.uniform(
                 0,
@@ -201,14 +203,14 @@ def load_data(
             )
             filtered_sparse_data = sparse_data[random_indices]
             sparse_index = np.load(idx_path, allow_pickle=True)
-            return SparseDataset(
-                values=filtered_sparse_data, index=sparse_index
-            )
+            return SparseDataset(values=filtered_sparse_data, index=sparse_index)
         elif type(path_description) == DensePathDescription:
-                df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
-                random_indices = np.random.uniform(0, df.shape[0], max_rows)  # type: ignore
-                random_subset = df.iloc[random_indices]  # type: ignore
-                return DenseDataset(values=random_subset)  # type: ignore
+            df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
+            random_indices = np.random.uniform(0, df.shape[0], max_rows)  # type: ignore
+            random_subset = df.iloc[random_indices]  # type: ignore
+            return DenseDataset(values=random_subset)  # type: ignore
+        else:
+            raise RuntimeError()
 
 
 class Loaders:
