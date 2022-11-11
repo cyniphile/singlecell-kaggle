@@ -164,7 +164,7 @@ class Datasets:
     Holds three basic datasets necessary for an experiment
     """
 
-    _: dataclasses.KW_ONLY
+    # _: dataclasses.KW_ONLY
     train_inputs: Dataset
     train_targets: Dataset
     test_inputs: Dataset
