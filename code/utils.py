@@ -292,25 +292,26 @@ def load_metadata():
     return pd.read_parquet(METADATA_PATH).set_index("cell_id")
 
 
-@flow
-def merge_with_metadata(*, train_inputs, test_inputs):
-    metadata = load_metadata()
-    match train_inputs, test_inputs:
-        case (
-            SparseDataset(values=train_inputs_values, index=train_inputs_index),
-            SparseDataset(values=test_inputs_values, index=test_inputs_index),
-        ):
-            pass
-        case (DenseDataset(train_inputs), DenseDataset(test_inputs)):
-            merged_train = pd.merge(
-                train_inputs, metadata, left_index=True, right_index=True
-            )
-            assert merged_train.shape[0] == train_inputs.shape[0]
-            merged_test = pd.merge(
-                test_inputs, metadata, left_index=True, right_index=True
-            )
-            assert merged_test.shape[0] == test_inputs.shape[0]
-            return merged_train, merged_test
+# @flow
+# TODO: don't match for saturn cloud
+# def merge_with_metadata(*, train_inputs, test_inputs):
+#     metadata = load_metadata()
+#     match train_inputs, test_inputs:
+#         case (
+#             SparseDataset(values=train_inputs_values, index=train_inputs_index),
+#             SparseDataset(values=test_inputs_values, index=test_inputs_index),
+#         ):
+#             pass
+#         case (DenseDataset(train_inputs), DenseDataset(test_inputs)):
+#             merged_train = pd.merge(
+#                 train_inputs, metadata, left_index=True, right_index=True
+#             )
+#             assert merged_train.shape[0] == train_inputs.shape[0]
+#             merged_test = pd.merge(
+#                 test_inputs, metadata, left_index=True, right_index=True
+#             )
+#             assert merged_test.shape[0] == test_inputs.shape[0]
+#             return merged_train, merged_test
 
 
 @task(cache_key_fn=task_input_hash)
