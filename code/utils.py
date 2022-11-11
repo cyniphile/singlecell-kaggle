@@ -176,12 +176,11 @@ class Datasets:
 def load_data(
     *,
     path_description: PathDescription,
-    offset: Optional[int] = None,
     max_rows: Optional[int] = None,
     random: bool = True,
 ) -> Dataset:
-    match (max_rows, offset, random):
-        case (None, _, _):
+    match (max_rows, random):
+        case (None, False):
             match path_description:
                 case SparsePathDescription(path, idx_path):
                     sparse_data = sp.sparse.load_npz(path)  # type: ignore
@@ -190,7 +189,7 @@ def load_data(
                 case DensePathDescription(path):
                     df: pd.DataFrame = pd.read_hdf(path)  # type: ignore
                     return DenseDataset(values=df)  # type: ignore
-        case (int(), None, True):
+        case (int(), True):
             # make np return same random string each time
             np.random.seed(0)
             match path_description:
@@ -211,15 +210,6 @@ def load_data(
                     random_indices = np.random.uniform(0, df.shape[0], max_rows)  # type: ignore
                     random_subset = df.iloc[random_indices]  # type: ignore
                     return DenseDataset(values=random_subset)  # type: ignore
-        case (int(), int(), False):
-            match path_description:
-                case SparsePathDescription(path, idx_path):
-                    sparse_data = sp.sparse.load_npz(path)[offset : offset + max_rows]  # type: ignore
-                    sparse_index = np.load(idx_path, allow_pickle=True)
-                    return SparseDataset(values=sparse_data, index=sparse_index)
-                case DensePathDescription(path):
-                    df: pd.DataFrame = pd.read_hdf(path, start=offset, stop=offset + max_rows)  # type: ignore
-                    return DenseDataset(values=df)
         case _:
             raise RuntimeError("Invalid arguments")
 
@@ -234,7 +224,6 @@ def make_loader(split_type, data_type):
         technology: TechnologyRepository,
         sparse: bool = False,
         max_rows: Optional[int] = None,
-        offset: int = 0,
     ):
         if sparse:
             idx_path = getattr(
@@ -245,7 +234,8 @@ def make_loader(split_type, data_type):
             )
             path_description = SparsePathDescription(values_path, idx_path)
             return load_data(
-                path_description=path_description, max_rows=max_rows, offset=offset
+                path_description=path_description,
+                max_rows=max_rows,
             )
         else:
             values_path = getattr(technology, f"{split_type}_{data_type}_path")
@@ -268,20 +258,17 @@ for split in SPLIT_TYPES:
 def load_all_data(
     technology: TechnologyRepository,
     max_rows_train: Optional[int] = None,
-    offset: Optional[int] = 0,
     full_submission: bool = False,
     sparse: bool = False,
 ):
     train_inputs = Loaders.load_train_inputs.submit(  # type: ignore
         technology=technology,
         max_rows=max_rows_train,
-        offset=offset,
         sparse=sparse,
     ).result()
     # Targets need to be in dense format for sklearn training :-(
     train_targets = Loaders.load_train_targets.submit(  # type: ignore
         technology=technology,
-        offset=offset,
         max_rows=max_rows_train,
     ).result()
     # If submitting to kaggle need to load full test_inputs to generate
@@ -294,7 +281,6 @@ def load_all_data(
         test_inputs = Loaders.load_test_inputs.submit(  # type: ignore
             technology=technology,
             max_rows=max_rows_train,
-            offset=offset,
             sparse=sparse,
         ).result()
     return Datasets(

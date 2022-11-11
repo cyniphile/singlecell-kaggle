@@ -30,7 +30,6 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 def last_year_rbf_flow(
     # default params used for testing
     max_rows_train: Optional[int] = 1_000,
-    offset: Optional[int] = None,
     full_submission: bool = False,
     technology: TechnologyRepository = utils.cite,
     inputs_pca_dims: int = 2,
@@ -50,7 +49,6 @@ def last_year_rbf_flow(
             technology=technology,
             max_rows_train=max_rows_train,
             full_submission=full_submission,
-            offset=offset,
             sparse=sparse,
         )
         kernel = RBF(length_scale=scale)
@@ -85,5 +83,6 @@ def last_year_rbf_flow(
 
 
 if __name__ == "__main__":
-    last_year_rbf_flow(max_rows_train=40_000)  # type: ignore
-    last_year_rbf_flow(max_rows_train=40_000, technology=utils.multi)  # type: ignore
+    # last_year_rbf_flow(max_rows_train=40_000)  # type: ignore
+    # last_year_rbf_flow(max_rows_train=40_000, technology=utils.multi)  # type: ignore
+    last_year_rbf_flow(max_rows_train=None)  # type: ignore
