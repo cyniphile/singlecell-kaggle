@@ -29,7 +29,7 @@ from sklearn.kernel_ridge import KernelRidge  # type: ignore
 )
 def last_year_rbf_flow(
     # default params used for testing
-    max_rows_train: Optional[int] = 1_000,
+    max_rows_train: int = 1_000,
     full_submission: bool = False,
     technology: TechnologyRepository = utils.cite,
     inputs_pca_dims: int = 2,

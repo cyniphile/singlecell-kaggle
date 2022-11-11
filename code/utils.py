@@ -176,10 +176,10 @@ class Datasets:
 def load_data(
     *,
     path_description: PathDescription,
-    max_rows: Optional[int] = None,
+    max_rows: int = 0,
 ) -> Dataset:  # type: ignore
     path = path_description.path
-    if max_rows is None:
+    if max_rows == 0:
         if type(path_description) == SparsePathDescription:
             idx_path = path_description.idx_path  # type: ignore
             sparse_data = sp.sparse.load_npz(path)  # type: ignore
@@ -222,7 +222,7 @@ def make_loader(split_type, data_type):
     def _loader(
         technology: TechnologyRepository,
         sparse: bool = False,
-        max_rows: Optional[int] = None,
+        max_rows: int = 0,
     ):
         if sparse:
             idx_path = getattr(
@@ -256,7 +256,7 @@ for split in SPLIT_TYPES:
 @flow
 def load_all_data(
     technology: TechnologyRepository,
-    max_rows_train: Optional[int] = None,
+    max_rows_train: int = 0,
     full_submission: bool = False,
     sparse: bool = False,
 ):
