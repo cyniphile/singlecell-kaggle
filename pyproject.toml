@@ -23,6 +23,9 @@ prefect = "^2.6.6"
 prefect-dask = "^0.2.1"
 seaborn = "^0.12.1"
 plotext = "^5.2.8"
+jax = {extras = ["cpu"], version = "^0.3.24"}
+flax = "^0.6.1"
+xgboost = "^1.7.1"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.9"

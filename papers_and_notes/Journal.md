@@ -1,6 +1,22 @@
+# 11/14
+
+Try xgboost
+
+
+# 11/11
+
+Want to try a NN approach which will handle dimensionality reduction natively.
+
+- xgboost custom loss in jax
+- mlp
+- to try: tabnet https://github.com/dreamquark-ai/tabnet
+- ensemble
+
 # 11/10
 
 Doing testing to see if dimensionality reduction could be done more intelligently. One highly ranked competitor posted that he uses only the top n most abs(correlated) features. 
+
+Got a lot of CV done, ran a lot of tests. I think RBF has taken me as far as I'm likely to go because I'm bumping up against overfitting and underfitting. PCA dims seems to have a clearish optimum, and adding more data isn't really helping CV that much. Might try submitting one of the full data models just to see what LB perf is but prob not gonna get to the >.81 level with RBF. Could still prove to be useful in an ensemble.
 
 # 11/9
 

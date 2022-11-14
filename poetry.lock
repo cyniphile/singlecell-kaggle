@@ -1,4 +1,12 @@
 [[package]]
+name = "absl-py"
+version = "1.3.0"
+description = "Abseil Python Common Libraries, see https://github.com/abseil/abseil-py."
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "aiofiles"
 version = "22.1.0"
 description = "File support for asyncio."
@@ -268,6 +276,22 @@ python-versions = ">=3.6.0"
 unicode_backport = ["unicodedata2"]
 
 [[package]]
+name = "chex"
+version = "0.1.5"
+description = "Chex: Testing made fun, in JAX!"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+absl-py = ">=0.9.0"
+dm-tree = ">=0.1.5"
+jax = ">=0.1.55"
+jaxlib = ">=0.1.37"
+numpy = ">=1.18.0"
+toolz = ">=0.9.0"
+
+[[package]]
 name = "click"
 version = "8.1.3"
 description = "Composable command line interface toolkit"
@@ -451,6 +475,14 @@ urllib3 = "*"
 zict = ">=0.1.3"
 
 [[package]]
+name = "dm-tree"
+version = "0.1.7"
+description = "Tree is a library for working with nested data structures."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "docker"
 version = "6.0.0"
 description = "A Python library for the Docker Engine API."
@@ -522,6 +554,27 @@ Werkzeug = ">=2.2.2"
 [package.extras]
 async = ["asgiref (>=3.2)"]
 dotenv = ["python-dotenv"]
+
+[[package]]
+name = "flax"
+version = "0.6.1"
+description = "Flax: A neural network library for JAX designed for flexibility"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+jax = ">=0.3.16"
+matplotlib = "*"
+msgpack = "*"
+numpy = ">=1.12"
+optax = "*"
+PyYAML = ">=5.4.1"
+rich = ">=11.1"
+typing-extensions = ">=4.1.1"
+
+[package.extras]
+testing = ["atari-py (==0.2.5)", "clu", "gym (==0.18.3)", "jaxlib", "jraph (>=0.0.6dev0)", "ml-collections", "opencv-python", "pytest", "pytest-cov", "pytest-custom-exit-code", "pytest-xdist (==1.34.0)", "pytype", "sentencepiece", "svn", "tensorflow-text (>=2.4.0)", "tensorflow-datasets", "tensorflow", "torch"]
 
 [[package]]
 name = "fonttools"
@@ -877,6 +930,43 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "jax"
+version = "0.3.24"
+description = "Differentiate, compile, and transform Numpy code."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+jaxlib = {version = "0.3.24", optional = true, markers = "extra == \"cpu\""}
+numpy = ">=1.20"
+opt_einsum = "*"
+scipy = ">=1.5"
+typing_extensions = "*"
+
+[package.extras]
+australis = ["protobuf (>=3.13,<4)"]
+ci = ["jaxlib (==0.3.22)"]
+cpu = ["jaxlib (==0.3.24)"]
+cuda = ["jaxlib (==0.3.24+cuda11.cudnn82)"]
+cuda11_cudnn805 = ["jaxlib (==0.3.24+cuda11.cudnn805)"]
+cuda11_cudnn82 = ["jaxlib (==0.3.24+cuda11.cudnn82)"]
+minimum-jaxlib = ["jaxlib (==0.3.22)"]
+tpu = ["jaxlib (==0.3.24)", "libtpu-nightly (==0.1.dev20221103)", "requests"]
+
+[[package]]
+name = "jaxlib"
+version = "0.3.24"
+description = "XLA library for JAX"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+numpy = ">=1.20"
+scipy = ">=1.5"
+
+[[package]]
 name = "jedi"
 version = "0.18.1"
 description = "An autocompletion tool for Python that can be used for text editors."
@@ -1228,6 +1318,37 @@ python-versions = ">=3.6"
 rsa = ["cryptography (>=3.0.0)"]
 signals = ["blinker (>=1.4.0)"]
 signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
+
+[[package]]
+name = "opt-einsum"
+version = "3.3.0"
+description = "Optimizing numpys einsum function"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.dependencies]
+numpy = ">=1.7"
+
+[package.extras]
+docs = ["sphinx (==1.2.3)", "sphinxcontrib-napoleon", "sphinx-rtd-theme", "numpydoc"]
+tests = ["pytest", "pytest-cov", "pytest-pep8"]
+
+[[package]]
+name = "optax"
+version = "0.1.3"
+description = "A gradient processing and optimisation library in JAX."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+absl-py = ">=0.7.1"
+chex = ">=0.0.4"
+jax = ">=0.1.55"
+jaxlib = ">=0.1.37"
+numpy = ">=1.18.0"
+typing-extensions = ">=3.10.0"
 
 [[package]]
 name = "orjson"
@@ -2203,6 +2324,26 @@ MarkupSafe = ">=2.1.1"
 watchdog = ["watchdog"]
 
 [[package]]
+name = "xgboost"
+version = "1.7.1"
+description = "XGBoost Python Package"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+numpy = "*"
+scipy = "*"
+
+[package.extras]
+dask = ["dask", "pandas", "distributed"]
+datatable = ["datatable"]
+pandas = ["pandas"]
+plotting = ["graphviz", "matplotlib"]
+pyspark = ["pyspark", "scikit-learn", "cloudpickle"]
+scikit-learn = ["scikit-learn"]
+
+[[package]]
 name = "yarl"
 version = "1.8.1"
 description = "Yet another URL library"
@@ -2240,9 +2381,10 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "flake8 
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10,<3.11"
-content-hash = "26a589899faa849ef9034bfe864789569040b8540ea90563aa4063dda85539fa"
+content-hash = "abd057387621e6baf46c0998abba424feaf0a403ba9035d91ad65e416503aaf7"
 
 [metadata.files]
+absl-py = []
 aiofiles = []
 aiohttp = []
 aiosignal = []
@@ -2270,6 +2412,7 @@ cachetools = []
 certifi = []
 cffi = []
 charset-normalizer = []
+chex = []
 click = [
     {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},
     {file = "click-8.1.3.tar.gz", hash = "sha256:7682dc8afb30297001674575ea00d1814d808d6a36af415a82bd481d37ba7b8e"},
@@ -2296,6 +2439,7 @@ decorator = [
     {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
 ]
 distributed = []
+dm-tree = []
 docker = []
 entrypoints = [
     {file = "entrypoints-0.4-py3-none-any.whl", hash = "sha256:f174b5ff827504fd3cd97cc3f8649f3693f51538c7e4bdf3ef002c8429d42f9f"},
@@ -2304,6 +2448,7 @@ entrypoints = [
 executing = []
 fastapi = []
 flask = []
+flax = []
 fonttools = []
 frozenlist = []
 fsspec = []
@@ -2336,6 +2481,8 @@ itsdangerous = [
     {file = "itsdangerous-2.1.2-py3-none-any.whl", hash = "sha256:2c2349112351b88699d8d4b6b075022c0808887cb7ad10069318a8b0bc88db44"},
     {file = "itsdangerous-2.1.2.tar.gz", hash = "sha256:5dbbc68b317e5e42f327f9021763545dc3fc3bfe22e6deb96aaf1fc38874156a"},
 ]
+jax = []
+jaxlib = []
 jedi = [
     {file = "jedi-0.18.1-py2.py3-none-any.whl", hash = "sha256:637c9635fcf47945ceb91cd7f320234a7be540ded6f3e99a50cb6febdfd1ba8d"},
     {file = "jedi-0.18.1.tar.gz", hash = "sha256:74137626a64a99c8eb6ae5832d99b3bdd7d29a3850fe2aa80a4126b2a7d949ab"},
@@ -2412,6 +2559,11 @@ nest-asyncio = []
 numexpr = []
 numpy = []
 oauthlib = []
+opt-einsum = [
+    {file = "opt_einsum-3.3.0-py3-none-any.whl", hash = "sha256:2455e59e3947d3c275477df7f5205b30635e266fe6dc300e3d9f9646bfcea147"},
+    {file = "opt_einsum-3.3.0.tar.gz", hash = "sha256:59f6475f77bbc37dcf7cd748519c0ec60722e91e63ca114e68821c0c54a46549"},
+]
+optax = []
 orjson = []
 packaging = [
     {file = "packaging-21.3-py3-none-any.whl", hash = "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"},
@@ -2613,6 +2765,7 @@ wcwidth = [
 ]
 websocket-client = []
 werkzeug = []
+xgboost = []
 yarl = []
 zict = []
 zipp = []

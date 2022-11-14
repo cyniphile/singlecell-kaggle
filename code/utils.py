@@ -639,6 +639,7 @@ def fit_and_score_pca_input_output(
         ).result()
     norm_pca_train_inputs = row_wise_std_scaler(pca_train_inputs).astype(np.float32)  # type: ignore
     norm_pca_test_inputs = row_wise_std_scaler(pca_test_inputs).astype(np.float32)  # type: ignore
+    # TODO: center targets as they are dense anyway
     pca_train_targets, pca_model_train_targets = truncated_pca.submit(  # type: ignore
         train_targets,
         targets_pca_dims,
