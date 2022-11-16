@@ -1,4 +1,6 @@
 from typing import List, Tuple, Union
+import jax
+from jax import numpy as jnp, jit
 import functools
 import sys
 import dataclasses, json
@@ -387,6 +389,7 @@ def k_fold_validation(
 
 @task
 def format_submission(Y_pred_raw, technology: TechnologyRepository):
+    # TODO: speed up with jax
     """
     Takes a square matrix of `gene*cell` of the kind usually output
     from models and formats it as necessary for submission to the
@@ -644,6 +647,7 @@ def fit_and_score_pca_input_output(
         train_targets,
         targets_pca_dims,
     ).result()
+    # pca_train_targets = np.vstack([np.ones(500), np.ones(500) + 1]).T
     model.fit(norm_pca_train_inputs, pca_train_targets)
     Y_hat_train = (
         model.predict(norm_pca_train_inputs) @ pca_model_train_targets.components_  # type: ignore
@@ -660,3 +664,73 @@ def fit_and_score_pca_input_output(
         return Score(score=test_score)
     else:
         return Y_hat
+
+
+@jit
+def row_corr(row_true, row_pred):
+    # convert to loss, which must be minimized
+    return 1 + (-1) * jnp.corrcoef(row_true, row_pred)[1, 0]
+
+
+@jit
+def correlation_loss(y_true, y_pred) -> float:
+    """
+    TODO: write unit test for this
+    Loss of the predictions according to the competition rules.
+    It is assumed that the predictions are not constant.
+    Returns the average of each sample's Pearson correlation coefficient
+
+    If correlation is high say .95, loss is 1 + (-.95) = .05
+    If low say -.95 loss is 1 + (--.95) = 1.95
+    If correlation is too high say 1.05, loss is 1 + (-1.05) = .05
+
+    """
+    if y_true.shape != y_pred.shape:
+        raise ValueError(f"Shapes are different. {y_true.shape} != {y_pred.shape}")
+    row_correlations = jax.vmap(row_corr, in_axes=(0, 0))(y_true, y_pred)
+    return row_correlations.sum() / y_true.shape[0]
+
+
+@jit
+def grad_correlation_loss(y_true, y_pred) -> float:
+    """
+    TODO: write unit test for this
+    Loss of the predictions according to the competition rules.
+    It is assumed that the predictions are not constant.
+    Returns the average of each sample's Pearson correlation coefficient
+
+    If correlation is high say .95, loss is 1 + (-.95) = .05
+    If low say -.95 loss is 1 + (--.95) = 1.95
+    If correlation is too high say 1.05, loss is 1 + (-1.05) = .05
+
+    """
+    if y_true.shape != y_pred.shape:
+        raise ValueError(f"Shapes are different. {y_true.shape} != {y_pred.shape}")
+
+    row_correlations = jax.vmap(row_corr, in_axes=(0, 0))(y_true, y_pred)
+    return row_correlations.sum() / y_true.shape[0]
+
+
+# @jit
+def hvp(f, inputs, vectors):
+    """Hessian-vector product."""
+    return jax.jvp(jax.grad(f), inputs, vectors)[1]
+
+
+# See: https://xgboost.readthedocs.io/en/latest/tutorials/custom_metric_obj.html
+# and: https://xgboost.readthedocs.io/en/latest/tutorials/custom_metric_obj.html#scikit-learn-interface
+def correlation_loss_grad(train, pred):
+    # TODO: review all this hessian math
+    train_reshaped = train.reshape(pred.shape)
+    # See https://jax.readthedocs.io/en/latest/notebooks/quickstart.html#taking-derivatives-with-grad
+    loss_function = lambda y_pred: correlation_loss(train_reshaped, y_pred)
+    grad_fn = jax.grad(loss_function)
+    if jnp.unique(pred).shape[0] < 2:
+        # Add some noise if all preds are the same value to avoid numerical issues.
+        p = np.random.normal(size=pred.shape, scale=train.std() / 100)
+        pred = pred + p
+    grad = grad_fn(pred)
+    # see https://towardsdatascience.com/jax-vs-pytorch-automatic-differentiation-for-xgboost-10222e1404ec
+    hess = hvp(loss_function, (pred,), (jnp.ones_like(pred),))
+    print(f"{hess=}")
+    return grad.reshape(pred.size), jnp.ones((pred.size))  # hess.reshape(pred.size)

@@ -20,12 +20,32 @@ import xgboost as xgb
 # `full_submission` branch.
 @run_or_get_cache
 @flow(
-    name="RBF with Input and Target PCA",
-    description="Based on last year's winner of RNA->Prot",
+    name="XGBoost with Input and Target PCA",
+    description="XGBoost with input and output PCA",
     # TODO: could be a way to turn this into a cache result
     # persist_result=True,
     # result_storage=LocalFileSystem(basepath=str(utils.OUTPUT_DIR)),
 )
+
+# TODO: add params
+# max_depth: The maximum depth per tree. A deeper tree might increase the performance, but also the complexity and chances to overfit.
+# The value must be an integer greater than 0. Default is 6.
+# learning_rate: The learning rate determines the step size at each iteration while your model optimizes toward its objective. A low learning rate makes computation slower, and requires more rounds to achieve the same reduction in residual error as a model with a high learning rate. But it optimizes the chances to reach the best optimum.
+# The value must be between 0 and 1. Default is 0.3.
+# n_estimators: The number of trees in our ensemble. Equivalent to the number of boosting rounds.
+# The value must be an integer greater than 0. Default is 100.
+# NB: In the standard library, this is referred as num_boost_round.
+# colsample_bytree: Represents the fraction of columns to be randomly sampled for each tree. It might improve overfitting.
+# The value must be between 0 and 1. Default is 1.
+# subsample: Represents the fraction of observations to be sampled for each tree. A lower values prevent overfitting but might lead to under-fitting.
+# The value must be between 0 and 1. Default is 1.
+# Regularization parameters:
+
+# alpha (reg_alpha): L1 regularization on the weights (Lasso Regression). When working with a large number of features, it might improve speed performances. It can be any integer. Default is 0.
+# lambda (reg_lambda): L2 regularization on the weights (Ridge Regression). It might help to reduce overfitting. It can be any integer. Default is 1.
+# gamma: Gamma is a pseudo-regularisation parameter (Lagrangian multiplier), and depends on the other parameters. The higher Gamma is, the higher the regularization. It can be any integer. Default is 0.
+
+
 def xgb_flow(
     # default params used for testing
     max_rows_train: int = 1_000,
@@ -35,6 +55,7 @@ def xgb_flow(
     targets_pca_dims: int = 2,
     k_folds: int = 2,
     sparse: bool = True,
+    custom_loss=True,
 ):
     with mlflow.start_run():
         # log all inputs into mlflow
@@ -48,7 +69,10 @@ def xgb_flow(
             full_submission=full_submission,
             sparse=sparse,
         )
-        model = xgb.XGBRegressor()
+        if custom_loss:
+            model = xgb.XGBRegressor(objective=utils.correlation_loss_grad)
+        else:
+            model = xgb.XGBRegressor()
 
         if full_submission:
             mlflow.sklearn.autolog()
@@ -79,6 +103,4 @@ def xgb_flow(
 
 
 if __name__ == "__main__":
-    # last_year_rbf_flow(max_rows_train=40_000)  # type: ignore
-    # last_year_rbf_flow(max_rows_train=40_000, technology=utils.multi)  # type: ignore
-    last_year_rbf_flow(max_rows_train=0)  # type: ignore
+    xgb_flow(max_rows_train=10000)  # type: ignore

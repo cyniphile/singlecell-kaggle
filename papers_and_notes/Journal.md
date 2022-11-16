@@ -1,6 +1,23 @@
+TODO: Read and understand DEEPLY: 
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366395
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366392
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366428
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366471 (see pyboost)
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366455 (simple and high placing, usage of boosting feature importance for feature selection, conservative C V)
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366417 (increase `n_iter` in tSVD, ??)
+- good basket of feature selection methods: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366460
+- good outline of process: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366504
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366453
+
+# 11/15
+Last day, did a final submission which improved things somewhat. 
+
+
 # 11/14
 
-Try xgboost
+Try xgboost. Got base working well. Improved multi, but not CITE. Could be room for tuning on both. Also worked on JAX-based custom gradient but was having problems with NaNs.
+
+TODO: need a better way to test ensembling/blending. Need to have CV with a blending option. Also noticed people were doing blending with CV trained models, since big models just can't be trained in memory. 
 
 
 # 11/11
