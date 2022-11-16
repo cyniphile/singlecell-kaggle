@@ -15,7 +15,7 @@ Thoughts:
 I think in many ways I was close to ranking better, as most of my "next steps" were things that winners did.
 - Think more carefully about normalization and scoring function. I kinda just went with some baselines without proper testing
 - Focus on smaller tests first. This slowed down iterations. Once small tests seem to have a direction, than validate with learning curves. I wasted too much time flirting with and often wastefully crossing the limits of my compute/memory. 
-- More careful feature selection, and easier incorporation with testing pipeline to speed up experiment velocity. 
+- More careful feature selection, and easier incorporation with testing pipeline to speed up experiment velocity. A base understanding of the chromosomes and meaning of the features would have been easy to acquire and is important.
 - Jax is shiny, good for speeding up numpy + any autodiff stuff, but probably just better to use pytorch for NN stuff.
 - Pipeline/tools stuff was worth it, though not the yak-shaving part. Next time will be able to move faster
 - in general, slow and steady. I was often writing my the journal too much after doing. Should plan (write down) what to do, then do edit, then do.
@@ -48,7 +48,7 @@ Want to try a NN approach which will handle dimensionality reduction natively.
 
 Doing testing to see if dimensionality reduction could be done more intelligently. One highly ranked competitor posted that he uses only the top n most abs(correlated) features. 
 
-Got a lot of CV done, ran a lot of tests. I think RBF has taken me as far as I'm likely to go because I'm bumping up against overfitting and underfitting. PCA dims seems to have a clearish optimum, and adding more data isn't really helping CV that much. Might try submitting one of the full data models just to see what LB perf is but prob not gonna get to the >.81 level with RBF. Could still prove to be useful in an ensemble.
+Got a lot of CV done, ran a lot of tests. I think RBF has taken me as far as I'm likely to go because I'm bumping up against overfitting and under-fitting. PCA dims seems to have a clear-ish optimum, and adding more data isn't really helping CV that much. Might try submitting one of the full data models just to see what LB perf is but prob not gonna get to the >.81 level with RBF. Could still prove to be useful in an ensemble.
 
 # 11/9
 
@@ -58,9 +58,9 @@ set up random sampling. Need to review reverse PCA, might be a problem. Also r2 
 
 review pca
 
-Find the covariance matrix $ C = X^TX/n $, change its basis to its eigenbasis (e.g. diagnolize) to $V\LambdaV^T$. By spectral theorem and the fact the C is symmetric, we know V, the orthonormal eigenbasis, exists. Since the eigenvalues of the covariance matrix are the directions of maximum covariance, we can filter out the lesser ones by setting those $\lambda$s to zero and 
+Find the covariance matrix $ C = X^TX/n $, change its basis to its eigenbasis (e.g. diagonalize) to $V\LambdaV^T$. By spectral theorem and the fact the C is symmetric, we know V, the orthonormal eigenbasis, exists. Since the eigenvalues of the covariance matrix are the directions of maximum covariance, we can filter out the lesser ones by setting those $\lambda$s to zero and 
 
-Did a lot of review of linalg and PCA to better understand how I was mis-using it so far (I think the main source of CV not correlated with LB). Making me wonder if a smarter dimensionality reduction scheme could work better, as this is a key challange.
+Did a lot of review of liner alg and PCA to better understand how I was mis-using it so far (I think the main source of CV not correlated with LB). Making me wonder if a smarter dimensionality reduction scheme could work better, as this is a key challenge.
 
 These resources were good:
 https://arxiv.org/pdf/1404.1100.pdf

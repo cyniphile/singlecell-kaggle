@@ -725,8 +725,8 @@ def correlation_loss_grad(train, pred):
     # See https://jax.readthedocs.io/en/latest/notebooks/quickstart.html#taking-derivatives-with-grad
     loss_function = lambda y_pred: correlation_loss(train_reshaped, y_pred)
     grad_fn = jax.grad(loss_function)
-    if jnp.unique(pred).shape[0] < 2:
-        # Add some noise if all preds are the same value to avoid numerical issues.
+    if jnp.unique(pred).shape[0] < 2:  # type: ignore 
+        # Add some noise if all predictions are the same value to avoid numerical issues.
         p = np.random.normal(size=pred.shape, scale=train.std() / 100)
         pred = pred + p
     grad = grad_fn(pred)
