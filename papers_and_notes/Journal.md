@@ -1,16 +1,31 @@
-TODO: Read and understand DEEPLY: 
-- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366395
-- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366392
-- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366428
-- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366471 (see pyboost)
+- good outline of process: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366504
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366409 simple neural net solution
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366395 TODO: Read and understand DEEPLY: 
 - https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366455 (simple and high placing, usage of boosting feature importance for feature selection, conservative C V)
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366471 (see pyboost)
 - https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366417 (increase `n_iter` in tSVD, ??)
 - good basket of feature selection methods: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366460
-- good outline of process: https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366504
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366392
+- https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366428
 - https://www.kaggle.com/competitions/open-problems-multimodal/discussion/366453
 
+
+Thoughts:
+
+I think in many ways I was close to ranking better, as most of my "next steps" were things that winners did.
+- Think more carefully about normalization and scoring function. I kinda just went with some baselines without proper testing
+- Focus on smaller tests first. This slowed down iterations. Once small tests seem to have a direction, than validate with learning curves. I wasted too much time flirting with and often wastefully crossing the limits of my compute/memory. 
+- More careful feature selection, and easier incorporation with testing pipeline to speed up experiment velocity. 
+- Jax is shiny, good for speeding up numpy + any autodiff stuff, but probably just better to use pytorch for NN stuff.
+- Pipeline/tools stuff was worth it, though not the yak-shaving part. Next time will be able to move faster
+- in general, slow and steady. I was often writing my the journal too much after doing. Should plan (write down) what to do, then do edit, then do.
+- Key really is to try as many thing as quickly as possible. I only did 14 submissions and 10x that was probably what I needed.
+- Pay extra attention to those solutions that are simplest
+
+
+
 # 11/15
-Last day, did a final submission which improved things somewhat. 
+Last day, did a final submission which improved things somewhat. Fixed bugs with the grad on my custom loss for xgboost, but still having hessian problems.
 
 
 # 11/14
